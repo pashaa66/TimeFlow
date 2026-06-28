@@ -234,5 +234,46 @@ namespace TimeFlow
             records.Sort((a, b) => string.Compare(b.SortDate(), a.SortDate(), StringComparison.Ordinal));
             return records;
         }
+
+        public string ExportMonthReport(int year = 0, int month = 0)
+        {
+            var now = DateTime.Today;
+            if (year == 0) year = now.Year;
+            if (month == 0) month = now.Month;
+            double rate = _settings.GetDouble("hourly_rate", 0);
+
+            var tasksList = new List<object>();
+            double totalSec = 0, totalEarn = 0;
+            foreach (var r in FullHistory())
+            {
+                var d = ParseDate(r.SortDate()?.Substring(0, Math.Min(10, r.SortDate()?.Length ?? 0)));
+                if (!d.HasValue || d.Value.Year != year || d.Value.Month != month) continue;
+                double sec = r.TotalSeconds;
+                tasksList.Add(new
+                {
+                    name = r.Name, category = r.Category, status = r.Status,
+                    completed_at = r.CompletedAt, seconds = sec,
+                    hours = Math.Round(sec / 3600.0, 3),
+                    earnings = Math.Round(sec / 3600.0 * rate, 2),
+                });
+                totalSec += sec;
+                totalEarn += sec / 3600.0 * rate;
+            }
+            Directory.CreateDirectory(Config.ExportDir);
+            string fname = $"report_{year:D4}-{month:D2}.json";
+            string path = Path.Combine(Config.ExportDir, fname);
+            JsonStore.Save(path, new
+            {
+                generated_at = Config.NowIso(),
+                period = $"{year:D4}-{month:D2}",
+                hourly_rate = rate,
+                currency = _settings.Get("currency", "₽"),
+                tasks = tasksList,
+                total_seconds = totalSec,
+                total_hours = Math.Round(totalSec / 3600.0, 3),
+                total_earnings = Math.Round(totalEarn, 2),
+            }, encrypt: false);
+            return path;
+        }
     }
 }
