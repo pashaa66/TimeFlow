@@ -69,4 +69,35 @@ namespace TimeFlow
         }
     }
 
+    public class HistoryRecord
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Category { get; set; }
+        public int EstimatedMinutes { get; set; }
+        public string CreatedAt { get; set; }
+        public string CompletedAt { get; set; }
+        public string RemovedAt { get; set; }
+        public string Status { get; set; }
+        public double TotalSeconds { get; set; }
+        public List<Session> Sessions { get; set; } = new();
+
+        public string SortDate() => !string.IsNullOrEmpty(CompletedAt) ? CompletedAt
+                                  : !string.IsNullOrEmpty(RemovedAt) ? RemovedAt
+                                  : CreatedAt ?? "";
+
+        public static HistoryRecord FromTask(TaskItem t, VirtualClock clock, string status)
+        {
+            return new HistoryRecord
+            {
+                Id = t.Id, Name = t.Name, Category = t.Category,
+                EstimatedMinutes = t.EstimatedMinutes,
+                CreatedAt = t.CreatedAt, CompletedAt = t.CompletedAt,
+                RemovedAt = "", Status = status,
+                TotalSeconds = t.ElapsedSeconds(clock),
+                Sessions = t.Sessions,
+            };
+        }
+    }
+
 }
