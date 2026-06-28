@@ -1,4 +1,4 @@
-﻿namespace TimeFlow;
+﻿namespace TimeFlow.UI;
 
 partial class MainForm
 {
