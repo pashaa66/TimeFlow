@@ -10,20 +10,21 @@ public class TasksPanel : UserControl
 {
     // Цвета темы
     private static readonly Color COLOR_SURFACE = Color.FromArgb(45, 45, 45);
+    private static readonly Color COLOR_BACKGROUND = Color.FromArgb(30, 30, 30);
     private static readonly Color COLOR_TEXT_PRIMARY = Color.FromArgb(220, 220, 220);
     private static readonly Color COLOR_ACCENT = Color.FromArgb(76, 175, 80);
-    private static readonly Color COLOR_BORDER = Color.FromArgb(60, 60, 60);
 
     // Элементы UI
-    private Panel _toolbar;
-    private Button _btnAdd;
-    private ComboBox _cmbFilter;
-    private FlowLayoutPanel _flowList;
-    private Label _lblEmptyState;
+    private TableLayoutPanel? _toolbar;
+    private Button? _btnAdd;
+    private ComboBox? _cmbFilter;
+    private FlowLayoutPanel? _flowList;
+    private Label? _lblEmptyState;
 
     // Данные
     private List<TaskItem> _tasks = new();
-    private SettingsStore? _settings; 
+    private SettingsStore? _settings;
+    private bool _suppressFilterEvent = false;
 
     // События для MainForm
     public event EventHandler<TaskItem>? TaskStartRequested;
@@ -35,14 +36,13 @@ public class TasksPanel : UserControl
     public TasksPanel()
     {
         InitializeLayout();
-        ApplyTheme();
     }
 
     public void BindSettings(SettingsStore settings)
     {
         _settings = settings;
         RefreshFilters();
-        RefreshList(); 
+        RefreshList();
     }
 
     public void SetTasks(List<TaskItem> tasks)
@@ -51,69 +51,77 @@ public class TasksPanel : UserControl
         RefreshList();
     }
 
-	public void UpdateTimers(VirtualClock? clock = null)
-	{
-		foreach (Control ctrl in _flowList.Controls)
-		{
-			if (ctrl is TaskCard card && card.CurrentTask != null)
-			{
-				string colorHex = _settings?.ColorFor(card.CurrentTask.Category);
-				card.RefreshCard(card.CurrentTask, clock, colorHex);
-			}
-		}
-	}
+    public void UpdateTimers(VirtualClock? clock = null)
+    {
+        if (_flowList == null) return;
+        foreach (Control ctrl in _flowList.Controls)
+        {
+            if (ctrl is TaskCard card && card.CurrentTask != null)
+            {
+                string colorHex = _settings?.ColorFor(card.CurrentTask.Category) ?? "";
+                card.RefreshCard(card.CurrentTask, clock, colorHex);
+            }
+        }
+    }
 
     private void InitializeLayout()
     {
         this.Dock = DockStyle.Fill;
-        this.BackColor = COLOR_SURFACE;
+        this.BackColor = COLOR_BACKGROUND;
 
-        // 1. Toolbar (верхняя панель)
-        _toolbar = new Panel
+        // === Toolbar: TableLayoutPanel ===
+        _toolbar = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
             Height = 48,
+            ColumnCount = 2,
+            RowCount = 1,
             BackColor = COLOR_SURFACE,
-            Padding = new Padding(10, 6, 10, 6)
+            Padding = new Padding(10, 6, 10, 6),
+            Margin = new Padding(0)
         };
+        _toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150F));
+        _toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        _toolbar.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
         _btnAdd = new Button
         {
             Text = "+ Новая задача",
-            Dock = DockStyle.Left,
-            Width = 140,
+            Dock = DockStyle.Fill,
             FlatStyle = FlatStyle.Flat,
             BackColor = COLOR_ACCENT,
             ForeColor = Color.White,
             Font = new Font("Segoe UI", 9, FontStyle.Bold),
-            Cursor = Cursors.Hand
+            Cursor = Cursors.Hand,
+            Margin = new Padding(0, 2, 6, 2)
         };
         _btnAdd.Click += (_, _) => AddTaskRequested?.Invoke(this, EventArgs.Empty);
 
         _cmbFilter = new ComboBox
         {
-            Dock = DockStyle.Right,
-            Width = 180,
+            Dock = DockStyle.Fill,
             DropDownStyle = ComboBoxStyle.DropDownList,
-            BackColor = Color.FromArgb(30, 30, 30),
+            BackColor = COLOR_BACKGROUND,
             ForeColor = COLOR_TEXT_PRIMARY,
             FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9)
+            Font = new Font("Segoe UI", 9),
+            Margin = new Padding(6, 2, 0, 2)
         };
-        _cmbFilter.SelectedIndexChanged += (_, _) => RefreshList();
+        _cmbFilter.SelectedIndexChanged += CmbFilter_SelectedIndexChanged;
 
-        _toolbar.Controls.Add(_cmbFilter);
-        _toolbar.Controls.Add(_btnAdd);
+        _toolbar.Controls.Add(_btnAdd, 0, 0);
+        _toolbar.Controls.Add(_cmbFilter, 1, 0);
 
-        // 2. FlowLayoutPanel (список карточек)
+        // === Список карточек: FlowLayoutPanel ===
         _flowList = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill,
             AutoScroll = true,
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
-            BackColor = COLOR_SURFACE,
-            Padding = new Padding(0)
+            BackColor = COLOR_BACKGROUND,
+            Padding = new Padding(0, 8, 0, 0),
+            Margin = new Padding(0)
         };
 
         // Пустое состояние
@@ -121,67 +129,80 @@ public class TasksPanel : UserControl
         {
             Text = "Нет задач. Нажмите «+ Новая задача»",
             AutoSize = true,
-            ForeColor = Color.FromArgb(100, 100, 100),
+            ForeColor = Color.FromArgb(120, 120, 120),
             Font = new Font("Segoe UI", 11, FontStyle.Italic),
             TextAlign = ContentAlignment.MiddleCenter,
-            Dock = DockStyle.Fill
+            Margin = new Padding(20, 40, 20, 0)
         };
-        _flowList.Controls.Add(_lblEmptyState);
 
+        // Порядок добавления: сначала Fill, потом Top.
         this.Controls.Add(_flowList);
         this.Controls.Add(_toolbar);
-        _toolbar.BringToFront();
     }
 
-    private void ApplyTheme()
+    private void CmbFilter_SelectedIndexChanged(object? sender, EventArgs e)
     {
-        this.BackColor = COLOR_SURFACE;
-        _flowList.BackColor = COLOR_SURFACE;
+        if (_suppressFilterEvent) return;
+        RefreshList();
     }
 
     private void RefreshFilters()
     {
-        _cmbFilter.Items.Clear();
-        _cmbFilter.Items.Add("Все категории");
-        
-        if (_settings != null)
+        if (_cmbFilter == null) return;
+
+        _suppressFilterEvent = true;
+        try
         {
-            foreach (var cat in _settings.Categories().Keys)
+            _cmbFilter.Items.Clear();
+            _cmbFilter.Items.Add("Все категории");
+
+            if (_settings != null)
             {
-                _cmbFilter.Items.Add(cat);
+                foreach (var cat in _settings.Categories().Keys)
+                {
+                    _cmbFilter.Items.Add(cat);
+                }
             }
+            else
+            {
+                _cmbFilter.Items.AddRange(new object[] { "Учёба", "Работа", "Отдых" });
+            }
+            _cmbFilter.SelectedIndex = 0;
         }
-        else
+        finally
         {
-            // если настройки ещё не загружены
-            _cmbFilter.Items.AddRange(new object[] { "Учёба", "Работа", "Отдых" });
+            _suppressFilterEvent = false;
         }
-        _cmbFilter.SelectedIndex = 0;
     }
 
     private void RefreshList()
     {
-        _flowList.Controls.Clear();
-        _flowList.Controls.Add(_lblEmptyState); 
+        if (_flowList == null || _lblEmptyState == null) return;
 
-        string filter = _cmbFilter.SelectedItem?.ToString() ?? "Все категории";
+        _flowList.SuspendLayout();
+        _flowList.Controls.Clear();
+
+        string filter = _cmbFilter?.SelectedItem?.ToString() ?? "Все категории";
         bool showAll = filter == "Все категории";
 
-        var filtered = showAll 
-            ? _tasks 
+        List<TaskItem> filtered = showAll
+            ? new List<TaskItem>(_tasks)
             : _tasks.FindAll(t => t.Category == filter);
 
-        // Сортировка
-        filtered.Sort((a, b) => 
+        // Сортировка: запущенные наверх, потом по убыванию 
+        filtered.Sort((a, b) =>
         {
             if (a.Running && !b.Running) return -1;
             if (!a.Running && b.Running) return 1;
-            return string.Compare(b.CreatedAt, a.CreatedAt);
+            return string.Compare(b.CreatedAt, a.CreatedAt, StringComparison.Ordinal);
         });
 
         if (filtered.Count == 0)
         {
             _lblEmptyState.Visible = true;
+            _flowList.Controls.Add(_lblEmptyState);
+            _flowList.ResumeLayout(true);
+            _flowList.PerformLayout();
             return;
         }
 
@@ -190,25 +211,19 @@ public class TasksPanel : UserControl
         foreach (var task in filtered)
         {
             var card = new TaskCard();
-            
-            // Подписка на события карточки
+
             card.StartClicked += (_, t) => TaskStartRequested?.Invoke(this, t);
             card.StopClicked += (_, t) => TaskStopRequested?.Invoke(this, t);
             card.DoneClicked += (_, t) => TaskDoneRequested?.Invoke(this, t);
             card.DeleteClicked += (_, t) => TaskDeleteRequested?.Invoke(this, t);
 
-            // Получаем цвет категории
-            string colorHex = _settings?.ColorFor(task.Category);
+            string colorHex = _settings?.ColorFor(task.Category) ?? "";
             card.RefreshCard(task, null, colorHex);
 
             _flowList.Controls.Add(card);
         }
-    }
 
-    // Вспомогательный метод для поиска задачи по контролу
-    private string GetTaskIdFromCard(TaskCard card)
-    {
-
-        return ""; 
+        _flowList.ResumeLayout(true);
+        _flowList.PerformLayout();
     }
 }

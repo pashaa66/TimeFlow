@@ -12,7 +12,7 @@ namespace TimeFlow
         private double _realAnchor;
         private double _virtualOffset;
         private double _lastReal;
-        private readonly Timer _timer;
+		private readonly System.Timers.Timer _timer;
 
         public event Action<double> Ticked;
         public event Action ConfigChanged;
@@ -22,7 +22,7 @@ namespace TimeFlow
             _realAnchor = UnixNow();
             _lastReal = _realAnchor;
             _virtualOffset = 0;
-            _timer = new Timer(1000);
+			_timer = new System.Timers.Timer(1000);
             _timer.Elapsed += (s, e) => OnTick();
         }
 

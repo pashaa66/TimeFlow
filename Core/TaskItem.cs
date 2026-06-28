@@ -41,7 +41,7 @@ namespace TimeFlow
             Sessions.Add(new Session { Start = DateTimeOffset.UtcNow.ToUnixTimeSeconds(), End = 0, Vsec = 0 });
         }
 
-        public void StopSession(VirtualClock clock = null)
+        public void StopSession(VirtualClock? clock = null)
         {
             double now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             foreach (var s in Sessions)
@@ -55,7 +55,7 @@ namespace TimeFlow
             }
         }
 
-        public double ElapsedSeconds(VirtualClock clock = null)
+        public double ElapsedSeconds(VirtualClock? clock = null)
         {
             double total = 0;
             double now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();

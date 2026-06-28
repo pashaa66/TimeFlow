@@ -30,7 +30,7 @@ namespace TimeFlow
             _data["categories"] = JsonSerializer.Serialize(Config.DefaultCategories);
         }
 
-        public string Get(string key, string fallback = null)
+        public string Get(string key, string? fallback = null)
             => _data.TryGetValue(key, out var v) ? v : fallback;
 
         public double GetDouble(string key, double fallback = 0)
