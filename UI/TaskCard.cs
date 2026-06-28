@@ -177,4 +177,7 @@ public class TaskCard : UserControl
             _ => Color.Gray
         };
     }
+	
+	// Свойство чтобы UpdateTimers работал корректно без перебора каждый тик
+	public TaskItem? CurrentTask => _task;
 }
