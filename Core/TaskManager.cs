@@ -40,26 +40,18 @@ namespace TimeFlow
                     _history.Add(JsonSerializer.Deserialize<HistoryRecord>(h.GetRawText()));
         }
 
-        public void SaveTasks()
-        {
+        public void SaveTasks() =>
             JsonStore.Save(Config.TasksFile, new { tasks = _tasks }, encrypt: true);
-        }
 
-        public void SaveHistory()
-        {
+        public void SaveHistory() =>
             JsonStore.Save(Config.HistoryFile, new { history = _history }, encrypt: true);
-        }
 
         public TaskItem AddTask(string name, string category, int estimatedMinutes)
         {
             name = name?.Trim();
             if (string.IsNullOrEmpty(name)) return null;
-            int em = estimatedMinutes < 0 ? 0 : estimatedMinutes;
-            var t = new TaskItem(name, category, em);
-            _tasks.Add(t);
-            SaveTasks();
-            TasksChanged?.Invoke();
-            return t;
+            var t = new TaskItem(name, category, estimatedMinutes < 0 ? 0 : estimatedMinutes);
+            _tasks.Add(t); SaveTasks(); TasksChanged?.Invoke(); return t;
         }
 
         public bool RemoveTask(string id)
@@ -70,11 +62,9 @@ namespace TimeFlow
             if (t.Running) t.StopSession(_clock);
             var r = HistoryRecord.FromTask(t, _clock, "removed");
             r.RemovedAt = Config.NowIso();
-            _history.Add(r);
-            SaveTasks(); SaveHistory();
+            _history.Add(r); SaveTasks(); SaveHistory();
             if (id == ActiveId()) ActiveChanged?.Invoke(null);
-            TasksChanged?.Invoke();
-            return true;
+            TasksChanged?.Invoke(); return true;
         }
 
         public bool CompleteTask(string id)
@@ -82,13 +72,11 @@ namespace TimeFlow
             var t = _tasks.FirstOrDefault(x => x.Id == id);
             if (t == null || t.Done) return false;
             if (t.Running) t.StopSession(_clock);
-            t.Done = true;
-            t.CompletedAt = Config.NowIso();
+            t.Done = true; t.CompletedAt = Config.NowIso();
             _history.Add(HistoryRecord.FromTask(t, _clock, "done"));
             SaveTasks(); SaveHistory();
             if (id == ActiveId()) ActiveChanged?.Invoke(null);
-            TasksChanged?.Invoke();
-            return true;
+            TasksChanged?.Invoke(); return true;
         }
 
         public bool UpdateTask(string id, string name, string category, int estimatedMinutes)
@@ -98,11 +86,8 @@ namespace TimeFlow
             if (!string.IsNullOrEmpty(name?.Trim())) t.Name = name.Trim();
             t.Category = category;
             t.EstimatedMinutes = estimatedMinutes < 0 ? 0 : estimatedMinutes;
-            SaveTasks();
-            TasksChanged?.Invoke();
-            return true;
+            SaveTasks(); TasksChanged?.Invoke(); return true;
         }
-
 
         public TaskItem ActiveTask() => _tasks.FirstOrDefault(t => t.Running);
         public string ActiveId() => ActiveTask()?.Id;
@@ -111,22 +96,122 @@ namespace TimeFlow
         {
             var t = _tasks.FirstOrDefault(x => x.Id == id);
             if (t == null) return;
-            t.StartSession();
-            SaveTasks();
-            ActiveChanged?.Invoke(id);
-            TasksChanged?.Invoke();
+            t.StartSession(); SaveTasks();
+            ActiveChanged?.Invoke(id); TasksChanged?.Invoke();
         }
 
         public void StopTask(string id)
         {
             var t = _tasks.FirstOrDefault(x => x.Id == id);
             if (t == null) return;
-            t.StopSession(_clock);
-            SaveTasks();
-            ActiveChanged?.Invoke(null);
-            TasksChanged?.Invoke();
+            t.StopSession(_clock); SaveTasks();
+            ActiveChanged?.Invoke(null); TasksChanged?.Invoke();
         }
 
         public TaskItem Get(string id) => _tasks.FirstOrDefault(t => t.Id == id);
+
+        public double EarningsToday()
+        {
+            double rate = _settings.GetDouble("hourly_rate", 0);
+            return SecondsOnDate(Config.TodayStr()) / 3600.0 * rate;
+        }
+
+        public double EarningsMonth()
+        {
+            double rate = _settings.GetDouble("hourly_rate", 0);
+            var now = DateTime.Today;
+            double total = 0;
+            foreach (var day in AllTrackedDays())
+            {
+                var d = ParseDate(day);
+                if (d.HasValue && d.Value.Year == now.Year && d.Value.Month == now.Month)
+                    total += SecondsOnDate(day);
+            }
+            return total / 3600.0 * rate;
+        }
+
+        public double[] SecondsByWeekday()
+        {
+            var totals = new double[7];
+            foreach (var kv in SecondsPerDayAll())
+            {
+                var d = ParseDate(kv.Key);
+                if (d.HasValue)
+                    totals[(int)d.Value.DayOfWeek == 0 ? 6 : (int)d.Value.DayOfWeek - 1] += kv.Value;
+            }
+            return totals;
+        }
+
+        public Dictionary<string, double> SecondsByCategoryToday()
+        {
+            var result = new Dictionary<string, double>();
+            string today = Config.TodayStr();
+            foreach (var t in _tasks)
+                foreach (var kv in SplitSessionsByDay(t.Sessions, _clock))
+                    if (kv.Key == today)
+                        result[t.Category] = result.GetValueOrDefault(t.Category, 0) + kv.Value;
+            foreach (var h in _history)
+                foreach (var kv in SplitSessionsByDay(h.Sessions, null))
+                    if (kv.Key == today)
+                        result[h.Category] = result.GetValueOrDefault(h.Category, 0) + kv.Value;
+            return result;
+        }
+
+        public Dictionary<string, double> SecondsByCategoryAll()
+        {
+            var result = new Dictionary<string, double>();
+            foreach (var t in _tasks)
+            {
+                double sec = t.ElapsedSeconds(_clock);
+                if (sec > 0) result[t.Category] = result.GetValueOrDefault(t.Category, 0) + sec;
+            }
+            foreach (var h in _history)
+                result[h.Category] = result.GetValueOrDefault(h.Category, 0) + h.TotalSeconds;
+            return result;
+        }
+
+        private double SecondsOnDate(string day)
+        {
+            double total = 0;
+            foreach (var t in _tasks)
+                total += SplitSessionsByDay(t.Sessions, _clock).GetValueOrDefault(day, 0);
+            foreach (var h in _history)
+                total += SplitSessionsByDay(h.Sessions, null).GetValueOrDefault(day, 0);
+            return total;
+        }
+
+        private Dictionary<string, double> SecondsPerDayAll()
+        {
+            var result = new Dictionary<string, double>();
+            foreach (var t in _tasks)
+                foreach (var kv in SplitSessionsByDay(t.Sessions, _clock))
+                    result[kv.Key] = result.GetValueOrDefault(kv.Key, 0) + kv.Value;
+            foreach (var h in _history)
+                foreach (var kv in SplitSessionsByDay(h.Sessions, null))
+                    result[kv.Key] = result.GetValueOrDefault(kv.Key, 0) + kv.Value;
+            return result;
+        }
+
+        private List<string> AllTrackedDays() => SecondsPerDayAll().Keys.ToList();
+
+        private static Dictionary<string, double> SplitSessionsByDay(List<Session> sessions, VirtualClock clock)
+        {
+            var result = new Dictionary<string, double>();
+            foreach (var s in sessions)
+            {
+                if (s.Start <= 0) continue;
+                var dt = DateTimeOffset.FromUnixTimeSeconds((long)s.Start).LocalDateTime;
+                string day = dt.ToString("yyyy-MM-dd");
+                double sec = s.End == 0 && clock != null ? clock.ElapsedVirtualSeconds(s.Start) : s.Vsec;
+                result[day] = result.GetValueOrDefault(day, 0) + sec;
+            }
+            return result;
+        }
+
+        private static DateTime? ParseDate(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return null;
+            return DateTime.TryParse(s.Substring(0, Math.Min(10, s.Length)), out var d) ? d : (DateTime?)null;
+        }
     }
 }
