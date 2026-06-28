@@ -1,0 +1,28 @@
+## === СБОРКА И ВРЕМЕННЫЕ ФАЙЛЫ .NET ===
+[Bb]in/
+[Oo]bj/
+out/
+*.nupkg
+packages/
+[Ll]og/
+
+## === IDE И РЕДАКТОРЫ ===
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.idea/
+*.iml
+.vscode/
+
+## === ОПЕРАЦИОННАЯ СИСТЕМА ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+## === ДАННЫЕ ПРИЛОЖЕНИЯ (ВАЖНО!) ===
+data/settings.ini
+data/tasks.json
+data/history.json
+data/exports/*.json
