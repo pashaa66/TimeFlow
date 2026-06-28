@@ -213,5 +213,26 @@ namespace TimeFlow
             if (string.IsNullOrEmpty(s)) return null;
             return DateTime.TryParse(s.Substring(0, Math.Min(10, s.Length)), out var d) ? d : (DateTime?)null;
         }
+
+        public List<HistoryRecord> FullHistory()
+        {
+            var records = new List<HistoryRecord>();
+            var seen = new HashSet<string>();
+
+            foreach (var t in _tasks)
+            {
+                var r = HistoryRecord.FromTask(t, _clock, t.Done ? "done" : "active");
+                records.Add(r);
+                seen.Add(t.Id);
+            }
+            foreach (var h in _history)
+            {
+                if (seen.Contains(h.Id)) continue;
+                records.Add(h);
+                seen.Add(h.Id);
+            }
+            records.Sort((a, b) => string.Compare(b.SortDate(), a.SortDate(), StringComparison.Ordinal));
+            return records;
+        }
     }
 }
