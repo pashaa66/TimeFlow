@@ -30,7 +30,7 @@ partial class MainForm
     {
         components = new System.ComponentModel.Container();
         AutoScaleMode = AutoScaleMode.Font;
-        ClientSize = new Size(800, 450);
+        ClientSize = new Size(1280, 720);
         Text = "TimeFlow";
     }
 
