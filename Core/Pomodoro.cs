@@ -1,5 +1,4 @@
 using System;
-using System.Timers;
 
 namespace TimeFlow
 {
@@ -10,7 +9,7 @@ namespace TimeFlow
         public const string PhaseLongBreak = "long_break";
 
         private readonly SettingsStore _settings;
-        private readonly Timer _timer;
+        private readonly System.Timers.Timer _timer;
 
         public bool Running { get; private set; }
         public string Phase { get; private set; } = PhaseWork;
@@ -26,7 +25,7 @@ namespace TimeFlow
         public PomodoroTimer(SettingsStore settings)
         {
             _settings = settings;
-            _timer = new Timer(1000);
+            _timer = new System.Timers.Timer(1000);
             _timer.Elapsed += (s, e) => OnTick();
             Configure();
             Remaining = _workSec;
