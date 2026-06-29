@@ -57,7 +57,7 @@ public class TaskCard : UserControl
         this.MaximumSize = new Size(int.MaxValue, 64);
         this.Margin = new Padding(0, 4, 0, 4);
         this.Padding = new Padding(0);
-        this.BackColor = COLOR_BORDER;  // виден в 2px-отступе TLP как рамка
+        this.BackColor = COLOR_BORDER;  
         this.DoubleBuffered = true;
 
         // === Внутренний TableLayoutPanel ===
@@ -144,7 +144,7 @@ public class TaskCard : UserControl
 
         this.Controls.Add(_layout);
 
-        // Авто-resize ширины 
+        // Авто-resize ширины
         this.ParentChanged += TaskCard_ParentChanged;
     }
 
@@ -173,7 +173,7 @@ public class TaskCard : UserControl
         int w = _parentFlow.ClientSize.Width;
         if (_parentFlow.VerticalScroll.Visible)
             w -= SystemInformation.VerticalScrollBarWidth;
-        if (w < 100) w = 100;  
+        if (w < 20) w = 20;
         this.Width = w;
     }
 

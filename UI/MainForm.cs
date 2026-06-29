@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using TimeFlow;
 
@@ -23,7 +24,7 @@ public partial class MainForm : Form
 
     // Компоненты UI
     private TasksPanel? _tasksPanel;
-    private Panel? _analyticsPlaceholder;
+    private AnalyticsPanel? _analyticsPanel;
 
     // Ядро приложения
     private SettingsStore? _settings;
@@ -49,11 +50,25 @@ public partial class MainForm : Form
 
         if (_clock != null)
         {
+
             _clock.Ticked += (ratio) =>
             {
-                if (_tasks.Exists(t => t.Running))
+                if (this.IsDisposed || !this.IsHandleCreated) return;
+                try
                 {
-                    _tasksPanel?.UpdateTimers(_clock);
+                    this.BeginInvoke(new Action(() =>
+                    {
+                        if (this.IsDisposed) return;
+                        if (_tasks.Exists(t => t.Running))
+                        {
+                            _tasksPanel?.UpdateTimers(_clock);
+                            RefreshAnalytics();
+                        }
+                    }));
+                }
+                catch (InvalidOperationException)
+                {
+                    
                 }
             };
             this.FormClosing += (_, _) => _clock.Stop();
@@ -75,7 +90,6 @@ public partial class MainForm : Form
 
     private void InitializeLayout()
     {
-
         _rootLayout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -127,28 +141,17 @@ public partial class MainForm : Form
             BackColor = COLOR_BORDER
         };
 
+        _mainSplit.SplitterMoved += OnSplitterMoved;
+
         // Левая панель: TasksPanel
         _tasksPanel = new TasksPanel();
         _tasksPanel.BindSettings(_settings!);
         _mainSplit.Panel1.Controls.Add(_tasksPanel);
 
-        // Правая панель: заглушка аналитики
-        _analyticsPlaceholder = new Panel
-        {
-            Dock = DockStyle.Fill,
-            BackColor = COLOR_BACKGROUND
-        };
-        var lblAnalytics = new Label
-        {
-            Text = "📊 Аналитика (T3.B.1)",
-            ForeColor = COLOR_TEXT_SECONDARY,
-            Font = new Font("Segoe UI", 12, FontStyle.Italic),
-            AutoSize = false,
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleCenter
-        };
-        _analyticsPlaceholder.Controls.Add(lblAnalytics);
-        _mainSplit.Panel2.Controls.Add(_analyticsPlaceholder);
+        // --- Правая панель: Аналитика ---
+        _analyticsPanel = new AnalyticsPanel();
+        _analyticsPanel.BindSettings(_settings!);
+        _mainSplit.Panel2.Controls.Add(_analyticsPanel);
 
         _rootLayout.Controls.Add(_mainSplit, 0, 1);
 
@@ -157,21 +160,19 @@ public partial class MainForm : Form
 
     private void OnFormLoad(object? sender, EventArgs e)
     {
-        // 1) Запуск часов
+
         _clock?.Start();
 
-        // 2) Настройка SplitContainer 
         if (_mainSplit != null)
         {
             int sw = _mainSplit.SplitterWidth;
             int width = _mainSplit.Width;
-            int min1 = 350;
-            int min2 = 200;
+            int min1 = 300;
+            int min2 = 450;
             int desired = 480;
 
             if (width < min1 + min2 + sw + 10)
             {
-
                 min1 = Math.Max(120, width / 3);
                 min2 = Math.Max(120, width / 3);
                 desired = width / 2;
@@ -184,16 +185,54 @@ public partial class MainForm : Form
                 int maxDistance = Math.Max(min1, width - min2 - sw);
                 int distance = Math.Max(min1, Math.Min(desired, maxDistance));
                 _mainSplit.SplitterDistance = distance;
+
+                int maxSplitterDistance = _mainSplit.Width - min2 - sw;
+                if (_mainSplit.SplitterDistance > maxSplitterDistance)
+                {
+                    _mainSplit.SplitterDistance = maxSplitterDistance;
+                }
             }
             catch (InvalidOperationException)
             {
-                
+
             }
         }
 
-        // 3) перерисовка задач 
         _tasksPanel?.SetTasks(_tasks);
+        RefreshAnalytics();
     }
+
+        private bool _isAdjustingSplitter = false;
+
+        private void OnSplitterMoved(object? sender, EventArgs e)
+        {
+                if (_isAdjustingSplitter || _mainSplit == null) return;
+
+                try
+                {
+                        _isAdjustingSplitter = true;
+
+                        int sw = _mainSplit.SplitterWidth;
+                        int width = _mainSplit.Width;
+                        int min2 = 450;
+
+                        int maxDistance = width - min2 - sw;
+
+                        if (maxDistance > 0 && _mainSplit.SplitterDistance > maxDistance)
+                        {
+                                _mainSplit.SplitterDistance = maxDistance;
+                        }
+
+                        else if (_mainSplit.SplitterDistance < 300)
+                        {
+                                _mainSplit.SplitterDistance = 300;
+                        }
+                }
+                finally
+                {
+                        _isAdjustingSplitter = false;
+                }
+        }
 
     private void ApplyDarkTheme()
     {
@@ -207,12 +246,14 @@ public partial class MainForm : Form
         task.StartSession();
         _tasksPanel?.SetTasks(_tasks);
         _clock?.Start();
+        RefreshAnalytics();
     }
 
     private void HandleTaskStop(TaskItem task)
     {
         task.StopSession(_clock);
         _tasksPanel?.SetTasks(_tasks);
+        RefreshAnalytics();
     }
 
     private void HandleTaskDone(TaskItem task)
@@ -221,12 +262,14 @@ public partial class MainForm : Form
         task.Done = true;
         task.CompletedAt = Config.NowIso();
         _tasksPanel?.SetTasks(_tasks);
+        RefreshAnalytics();
     }
 
     private void HandleTaskDelete(TaskItem task)
     {
         _tasks.Remove(task);
         _tasksPanel?.SetTasks(_tasks);
+        RefreshAnalytics();
     }
 
     private void ShowAddTaskDialog()
@@ -253,12 +296,12 @@ public partial class MainForm : Form
             BackColor = COLOR_SURFACE
         };
         tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        tlp.RowStyles.Add(new RowStyle(SizeType.Absolute, 22F));  // label name
-        tlp.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));  // textbox
-        tlp.RowStyles.Add(new RowStyle(SizeType.Absolute, 22F));  // label cat
-        tlp.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));  // combobox
-        tlp.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));  // разделитель
-        tlp.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));  // панель кнопок
+        tlp.RowStyles.Add(new RowStyle(SizeType.Absolute, 22F));
+        tlp.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
+        tlp.RowStyles.Add(new RowStyle(SizeType.Absolute, 22F));
+        tlp.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
+        tlp.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        tlp.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
 
         // --- подпись над полем названия ---
         var lblName = new Label
@@ -311,7 +354,7 @@ public partial class MainForm : Form
         cmbCat.SelectedIndex = 0;
         tlp.Controls.Add(cmbCat, 0, 3);
 
-        // --- пустой разделитель (fill) ---
+        // --- пустой разделитель ---
         tlp.Controls.Add(new Panel { Dock = DockStyle.Fill, BackColor = COLOR_SURFACE }, 0, 4);
 
         // --- панель с кнопками ---
@@ -324,10 +367,10 @@ public partial class MainForm : Form
             Margin = new Padding(0),
             BackColor = COLOR_SURFACE
         };
-        btnRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120F));  // Создать
-        btnRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 12F));   // зазор
-        btnRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120F));  // Отмена
-        btnRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));   // fill
+        btnRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120F));
+        btnRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 12F));
+        btnRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120F));
+        btnRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         btnRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
         var btnOk = new Button
@@ -348,6 +391,7 @@ public partial class MainForm : Form
                 var newTask = new TaskItem(txtName.Text, cmbCat.SelectedItem?.ToString() ?? "Учёба", 60);
                 _tasks.Add(newTask);
                 _tasksPanel?.SetTasks(_tasks);
+                RefreshAnalytics();
                 dlg.DialogResult = DialogResult.OK;
                 dlg.Close();
             }
@@ -401,5 +445,69 @@ public partial class MainForm : Form
         _tasks[0].StartSession();
 
         _tasksPanel?.SetTasks(_tasks);
+        RefreshAnalytics();
+    }
+
+    // Расчёт статистики для аналитики из текущего списка задач
+    private void RefreshAnalytics()
+    {
+        if (_analyticsPanel == null || _settings == null) return;
+
+        // Заработок
+        double rate = _settings.GetDouble("hourly_rate", 0);
+        string today = Config.TodayStr();
+
+        double todaySeconds = 0;
+        foreach (var t in _tasks)
+        {
+            foreach (var s in t.Sessions)
+            {
+                if (s.Start <= 0) continue;
+                var dt = DateTimeOffset.FromUnixTimeSeconds((long)s.Start).LocalDateTime;
+                if (dt.ToString("yyyy-MM-dd") == today)
+                {
+                    todaySeconds += s.End == 0 && _clock != null
+                        ? _clock.ElapsedVirtualSeconds(s.Start)
+                        : s.Vsec;
+                }
+            }
+        }
+        double earningsToday = todaySeconds / 3600.0 * rate;
+        double earningsMonth = earningsToday;
+
+        // Часы по дням недели
+        double[] weekly = new double[7];
+        foreach (var t in _tasks)
+        {
+            foreach (var s in t.Sessions)
+            {
+                if (s.Start <= 0) continue;
+                var dt = DateTimeOffset.FromUnixTimeSeconds((long)s.Start).LocalDateTime;
+                int dayIndex = (int)dt.DayOfWeek == 0 ? 6 : (int)dt.DayOfWeek - 1;
+                weekly[dayIndex] += s.End == 0 && _clock != null
+                    ? _clock.ElapsedVirtualSeconds(s.Start)
+                    : s.Vsec;
+            }
+        }
+
+        // По категориям за сегодня
+        var byCategory = new Dictionary<string, double>();
+        foreach (var t in _tasks)
+        {
+            foreach (var s in t.Sessions)
+            {
+                if (s.Start <= 0) continue;
+                var dt = DateTimeOffset.FromUnixTimeSeconds((long)s.Start).LocalDateTime;
+                if (dt.ToString("yyyy-MM-dd") == today)
+                {
+                    double sec = s.End == 0 && _clock != null
+                        ? _clock.ElapsedVirtualSeconds(s.Start)
+                        : s.Vsec;
+                    byCategory[t.Category] = byCategory.GetValueOrDefault(t.Category, 0) + sec;
+                }
+            }
+        }
+
+        _analyticsPanel.RefreshAll(earningsToday, earningsMonth, _tasks, weekly, byCategory);
     }
 }
