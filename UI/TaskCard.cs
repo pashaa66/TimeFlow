@@ -24,6 +24,8 @@ public class TaskCard : UserControl
     private TableLayoutPanel? _layout;
     private Panel? _catBar;
     private Label? _lblName;
+    private Label? _lblCategory;   
+    private TableLayoutPanel? _namePanel;  
     private Label? _lblTime;
     private FlowLayoutPanel? _btnPanel;
     private Button? _btnRun;     // ▶ / ⏸ — переключатель Start/Stop
@@ -52,9 +54,9 @@ public class TaskCard : UserControl
     private void InitializeLayout()
     {
         // === Внешний UserControl ===
-        this.Height = 64;
-        this.MinimumSize = new Size(0, 64);
-        this.MaximumSize = new Size(int.MaxValue, 64);
+        this.Height = 84;
+        this.MinimumSize = new Size(0, 84);
+        this.MaximumSize = new Size(int.MaxValue, 84);
         this.Margin = new Padding(0, 4, 0, 4);
         this.Padding = new Padding(0);
         this.BackColor = COLOR_BORDER;  
@@ -95,6 +97,32 @@ public class TaskCard : UserControl
             BackColor = COLOR_CARD_INNER,
             Text = "Задача"
         };
+
+        _lblCategory = new Label
+        {
+            AutoSize = true,
+            BackColor = Color.Gray,            
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 8, FontStyle.Bold),
+            Text = "  Категория  ",
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(10, 0, 0, 4),
+            Padding = new Padding(0)
+        };
+
+        _namePanel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            BackColor = COLOR_CARD_INNER,
+            Margin = new Padding(0),
+            Padding = new Padding(0)
+        };
+        _namePanel.RowStyles.Add(new RowStyle(SizeType.Percent, 55F));
+        _namePanel.RowStyles.Add(new RowStyle(SizeType.Percent, 45F));
+        _namePanel.Controls.Add(_lblName, 0, 0);
+        _namePanel.Controls.Add(_lblCategory, 0, 1);
 
         _lblTime = new Label
         {
@@ -138,7 +166,7 @@ public class TaskCard : UserControl
         _btnPanel.Controls.Add(_btnDelete);
 
         _layout.Controls.Add(_catBar, 0, 0);
-        _layout.Controls.Add(_lblName, 1, 0);
+        _layout.Controls.Add(_namePanel, 1, 0);  // имя + chip вместо одного _lblName
         _layout.Controls.Add(_lblTime, 2, 0);
         _layout.Controls.Add(_btnPanel, 3, 0);
 
@@ -199,6 +227,7 @@ public class TaskCard : UserControl
         _task = task;
         if (task == null) return;
         if (_lblName == null || _lblTime == null || _catBar == null) return;
+        if (_lblCategory == null || _namePanel == null) return;
         if (_btnRun == null || _btnDone == null || _btnDelete == null || _layout == null) return;
 
         // --- Текст ---
@@ -207,16 +236,22 @@ public class TaskCard : UserControl
         TimeSpan ts = TimeSpan.FromSeconds((int)secs);
         _lblTime.Text = $"{ts.Hours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}";
 
-        // --- Цвет категории на левой полоске ---
+        // --- Цвет левой полоски (по категории) ---
+        Color catColor;
         if (!string.IsNullOrEmpty(categoryColorHex))
         {
-            try { _catBar.BackColor = ColorTranslator.FromHtml(categoryColorHex); }
-            catch { _catBar.BackColor = GetFallbackColor(task.Category); }
+            try { catColor = ColorTranslator.FromHtml(categoryColorHex); }
+            catch { catColor = GetFallbackColor(task.Category); }
         }
         else
         {
-            _catBar.BackColor = GetFallbackColor(task.Category);
+            catColor = GetFallbackColor(task.Category);
         }
+        _catBar.BackColor = catColor;
+
+        // --- Цветная категория под названием ---
+        _lblCategory.Text = $"  {task.Category}  ";
+        _lblCategory.BackColor = catColor;
 
         // --- Состояние ---
         bool isRunning = task.Running;
@@ -228,8 +263,11 @@ public class TaskCard : UserControl
 
         _layout.BackColor = borderColor;
         _lblName.BackColor = innerColor;
+        _namePanel.BackColor = innerColor;
         _lblTime.BackColor = innerColor;
         if (_btnPanel != null) _btnPanel.BackColor = innerColor;
+
+        _lblCategory.BackColor = catColor;
 
         _lblTime.ForeColor = isRunning ? Color.FromArgb(20, 60, 25) : COLOR_TEXT_SECONDARY;
 
