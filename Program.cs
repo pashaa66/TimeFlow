@@ -23,7 +23,13 @@ static class Program
         try
         {
             ApplicationConfiguration.Initialize();
-            Application.Run(new MainForm());
+            Config.EnsureDirs();
+            var settings = new SettingsStore();
+            var clock = new VirtualClock();
+            var tasks = new TaskManager(settings, clock);
+            var pomodoro = new PomodoroTimer(settings);
+            clock.Start();
+            Application.Run(new MainForm(settings, clock, tasks, pomodoro));
         }
         catch (Exception ex)
         {
