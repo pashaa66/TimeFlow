@@ -108,15 +108,16 @@ public partial class MainForm : Form
         _topBar = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 3,
+            ColumnCount = 4,
             RowCount = 1,
             BackColor = COLOR_SURFACE,
             Padding = new Padding(10, 0, 10, 0),
             Margin = new Padding(0)
         };
         _topBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30F));
-        _topBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40F));
-        _topBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30F));
+        _topBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62F));
+        _topBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 4F));
+		_topBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 4F));
         _topBar.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
         var lblTitle = new Label
@@ -130,18 +131,18 @@ public partial class MainForm : Form
         };
         _topBar.Controls.Add(lblTitle, 0, 0);
 
-        var btnHistory = new Button
-        {
-            Text = "📋",
-            Size = new Size(50, 50),
-            FlatStyle = FlatStyle.Flat,
-            BackColor = COLOR_SURFACE,
-            ForeColor = COLOR_TEXT_PRIMARY,
-            Font = new Font("Segoe UI", 14),
-            Cursor = Cursors.Hand,
-            Anchor = AnchorStyles.Top | AnchorStyles.Right,
-            Margin = new Padding(0, 20, 5, 0)
-        };
+		var btnHistory = new Button
+		{
+			Text = "📋",
+			Size = new Size(50, 50),
+			FlatStyle = FlatStyle.Flat,
+			BackColor = COLOR_SURFACE,
+			ForeColor = COLOR_TEXT_PRIMARY,
+			Font = new Font("Segoe UI", 14),
+			Cursor = Cursors.Hand,
+			Anchor = AnchorStyles.Top | AnchorStyles.Right,
+			Margin = new Padding(0, 20, 5, 0)
+		};
         btnHistory.Click += (_, _) =>
         {
 
@@ -202,7 +203,27 @@ public partial class MainForm : Form
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         };
-        _topBar.Controls.Add(btnHistory, 2, 0);
+        _topBar.Controls.Add(btnHistory, 3, 0);
+		
+		// Кнопка настроек
+		var btnSettings = new Button
+		{
+			Text = "⚙️",
+			Size = new Size(50, 50),  
+			FlatStyle = FlatStyle.Flat,
+			BackColor = COLOR_SURFACE,
+			ForeColor = COLOR_TEXT_PRIMARY,
+			Font = new Font("Segoe UI", 14),
+			Cursor = Cursors.Hand,
+			Anchor = AnchorStyles.Top | AnchorStyles.Right,
+			Margin = new Padding(0, 20, 5, 0)  
+		};
+		btnSettings.Click += (_, _) => 
+		{
+			using var settingsDialog = new SettingsDialog(_settings);
+			settingsDialog.ShowDialog(this);
+		};
+		_topBar.Controls.Add(btnSettings, 2, 0);  
 
         _rootLayout.Controls.Add(_topBar, 0, 0);
 
