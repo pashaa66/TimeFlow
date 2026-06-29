@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Windows.Forms;
 using TimeFlow;
 
@@ -50,7 +52,6 @@ public partial class MainForm : Form
 
         if (_clock != null)
         {
-
             _clock.Ticked += (ratio) =>
             {
                 if (this.IsDisposed || !this.IsHandleCreated) return;
@@ -129,6 +130,80 @@ public partial class MainForm : Form
         };
         _topBar.Controls.Add(lblTitle, 0, 0);
 
+        var btnHistory = new Button
+        {
+            Text = "📋",
+            Size = new Size(50, 50),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = COLOR_SURFACE,
+            ForeColor = COLOR_TEXT_PRIMARY,
+            Font = new Font("Segoe UI", 14),
+            Cursor = Cursors.Hand,
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            Margin = new Padding(0, 20, 5, 0)
+        };
+        btnHistory.Click += (_, _) =>
+        {
+
+            var history = new List<HistoryRecord>();
+            if (_tasks != null && _clock != null)
+            {
+                foreach (var t in _tasks)
+                {
+                    history.Add(HistoryRecord.FromTask(
+                        t, _clock,
+                        t.Done ? "done" : "active"));
+                }
+            }
+
+            try
+            {
+                var hdata = JsonStore.Load(Config.HistoryFile);
+                if (hdata.ValueKind == JsonValueKind.Object &&
+                    hdata.TryGetProperty("history", out var histArr))
+                {
+                    foreach (var h in histArr.EnumerateArray())
+                    {
+                        var rec = JsonSerializer.Deserialize<HistoryRecord>(
+                            h.GetRawText());
+                        if (rec != null) history.Add(rec);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+
+                MessageBox.Show(this,
+                    "Не удалось прочитать историю удалённых задач:\n" + ex.Message,
+                    "TimeFlow", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+
+            history = history
+                .GroupBy(r => r.Id ?? "")
+                .Select(g => g
+                    .OrderByDescending(r => r.SortDate())
+                    .First())
+                .ToList();
+
+            history.Sort((a, b) =>
+                string.Compare(b.SortDate(), a.SortDate(), StringComparison.Ordinal));
+
+            try
+            {
+                using var frm = new HistoryForm(_settings!, history);
+                frm.ShowDialog(this);
+            }
+            catch (InvalidOperationException)
+            {
+
+                MessageBox.Show(this,
+                    "Не удалось открыть окно истории. Попробуйте ещё раз.",
+                    "TimeFlow",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        };
+        _topBar.Controls.Add(btnHistory, 2, 0);
+
         _rootLayout.Controls.Add(_topBar, 0, 0);
 
         // --- SplitContainer ---
@@ -160,7 +235,6 @@ public partial class MainForm : Form
 
     private void OnFormLoad(object? sender, EventArgs e)
     {
-
         _clock?.Start();
 
         if (_mainSplit != null)
@@ -194,7 +268,7 @@ public partial class MainForm : Form
             }
             catch (InvalidOperationException)
             {
-
+               
             }
         }
 
@@ -202,37 +276,36 @@ public partial class MainForm : Form
         RefreshAnalytics();
     }
 
-        private bool _isAdjustingSplitter = false;
+    private bool _isAdjustingSplitter = false;
 
-        private void OnSplitterMoved(object? sender, EventArgs e)
+    private void OnSplitterMoved(object? sender, EventArgs e)
+    {
+        if (_isAdjustingSplitter || _mainSplit == null) return;
+
+        try
         {
-                if (_isAdjustingSplitter || _mainSplit == null) return;
+            _isAdjustingSplitter = true;
 
-                try
-                {
-                        _isAdjustingSplitter = true;
+            int sw = _mainSplit.SplitterWidth;
+            int width = _mainSplit.Width;
+            int min2 = 450;
 
-                        int sw = _mainSplit.SplitterWidth;
-                        int width = _mainSplit.Width;
-                        int min2 = 450;
+            int maxDistance = width - min2 - sw;
 
-                        int maxDistance = width - min2 - sw;
-
-                        if (maxDistance > 0 && _mainSplit.SplitterDistance > maxDistance)
-                        {
-                                _mainSplit.SplitterDistance = maxDistance;
-                        }
-
-                        else if (_mainSplit.SplitterDistance < 300)
-                        {
-                                _mainSplit.SplitterDistance = 300;
-                        }
-                }
-                finally
-                {
-                        _isAdjustingSplitter = false;
-                }
+            if (maxDistance > 0 && _mainSplit.SplitterDistance > maxDistance)
+            {
+                _mainSplit.SplitterDistance = maxDistance;
+            }
+            else if (_mainSplit.SplitterDistance < 300)
+            {
+                _mainSplit.SplitterDistance = 300;
+            }
         }
+        finally
+        {
+            _isAdjustingSplitter = false;
+        }
+    }
 
     private void ApplyDarkTheme()
     {
@@ -267,9 +340,59 @@ public partial class MainForm : Form
 
     private void HandleTaskDelete(TaskItem task)
     {
+
+        if (task.Running) task.StopSession(_clock);
+
+        Exception saveError = null;
+        try
+        {
+            var removed = HistoryRecord.FromTask(task, _clock, "deleted");
+            removed.RemovedAt = Config.NowIso();
+
+            var existing = new List<HistoryRecord>();
+            try
+            {
+                var hdata = JsonStore.Load(Config.HistoryFile);
+                if (hdata.ValueKind == JsonValueKind.Object &&
+                    hdata.TryGetProperty("history", out var histArr))
+                {
+                    foreach (var h in histArr.EnumerateArray())
+                    {
+                        var rec = JsonSerializer.Deserialize<HistoryRecord>(
+                            h.GetRawText());
+                        if (rec != null) existing.Add(rec);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                saveError = ex;
+                existing = new List<HistoryRecord>();
+            }
+
+            existing.RemoveAll(r => r.Id == removed.Id);
+            existing.Add(removed);
+
+            JsonStore.Save(Config.HistoryFile, new { history = existing },
+                encrypt: true);
+        }
+        catch (Exception ex)
+        {
+
+            if (saveError == null) saveError = ex;
+        }
+
         _tasks.Remove(task);
         _tasksPanel?.SetTasks(_tasks);
         RefreshAnalytics();
+
+        if (saveError != null)
+        {
+            MessageBox.Show(this,
+                "Задача удалена из списка, но не удалось сохранить её в историю:\n" +
+                saveError.Message,
+                "TimeFlow", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     private void ShowAddTaskDialog()
