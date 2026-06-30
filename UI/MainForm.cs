@@ -768,6 +768,7 @@ public partial class MainForm : Form
         this.BackColor = COLOR_BACKGROUND;
         this.ForeColor = COLOR_TEXT_PRIMARY;
         this.Text = "TimeFlow";
+        this.Icon = MakeTrayIcon();
     }
 
     private void SetupTray()
@@ -796,16 +797,16 @@ public partial class MainForm : Form
 
     private static Icon MakeTrayIcon()
     {
-        var bmp = new Bitmap(16, 16);
+        var bmp = new Bitmap(32, 32);
         using (var g = Graphics.FromImage(bmp))
         {
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             using var brush = new SolidBrush(COLOR_ACCENT);
-            g.FillEllipse(brush, 0, 0, 16, 16);
-            using var font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            g.FillEllipse(brush, 0, 0, 32, 32);
+            using var font = new Font("Segoe UI", 16F, FontStyle.Bold);
             using var textBrush = new SolidBrush(Color.White);
             var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-            g.DrawString("T", font, textBrush, new RectangleF(0, 0, 16, 16), sf);
+            g.DrawString("T", font, textBrush, new RectangleF(0, 0, 32, 32), sf);
         }
         return Icon.FromHandle(bmp.GetHicon());
     }
