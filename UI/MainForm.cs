@@ -46,6 +46,8 @@ public partial class MainForm : Form
     private Label? _lblVTimeValue;
     private Button? _btnVTimeToggle;
 
+    private NotifyIcon? _trayIcon;
+
     private readonly System.Windows.Forms.Timer _uiTimer = new() { Interval = 1000 };
 
     private bool _isAdjustingSplitter = false;
@@ -67,6 +69,8 @@ public partial class MainForm : Form
         UpdateVTimeDisplay();
 
         this.Load += OnFormLoad;
+
+        SetupTray();
     }
 
     private void WireEvents()
@@ -193,6 +197,7 @@ public partial class MainForm : Form
                 string msg = finishedPhase == PomodoroTimer.PhaseWork
                     ? "Фаза работы завершена. Перерыв!"
                     : "Перерыв окончен. За работу!";
+                _trayIcon?.ShowBalloonTip(4000, "TimeFlow — Pomodoro", msg, ToolTipIcon.Info);
                 MessageBox.Show(this, msg, "Pomodoro",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 UpdatePomodoroDisplay();
@@ -623,6 +628,12 @@ public partial class MainForm : Form
     protected override void OnSizeChanged(EventArgs e)
     {
         base.OnSizeChanged(e);
+
+        if (WindowState == FormWindowState.Minimized){
+            Hide();
+            _trayIcon?.ShowBalloonTip(2000, "TimeFlow", "Приложение свёрнуто в трей", ToolTipIcon.Info);
+        }
+
         if (_mainSplit == null || _isAdjustingSplitter) return;
 
         try
@@ -676,7 +687,7 @@ public partial class MainForm : Form
             catch { /* не блокируем закрытие формы */ }
         }
         catch { /* не блокируем закрытие формы */ }
-
+        _trayIcon?.Dispose();
         base.OnFormClosing(e);
     }
 
@@ -685,6 +696,46 @@ public partial class MainForm : Form
         this.BackColor = COLOR_BACKGROUND;
         this.ForeColor = COLOR_TEXT_PRIMARY;
         this.Text = "TimeFlow";
+    }
+
+    private void SetupTray()
+    {
+        _trayIcon = new NotifyIcon
+        {
+            Icon = MakeTrayIcon(),
+            Visible = true,
+            Text = "TimeFlow"
+        };
+
+        var menu = new ContextMenuStrip();
+        menu.Items.Add("Открыть", null, (_, _) => RestoreFromTray());
+        menu.Items.Add("Выход", null, (_, _) => { _trayIcon!.Visible = false; Application.Exit(); });
+        _trayIcon.ContextMenuStrip = menu;
+
+        _trayIcon.DoubleClick += (_, _) => RestoreFromTray();
+    }
+
+    private void RestoreFromTray()
+    {
+        Show();
+        WindowState = FormWindowState.Normal;
+        Activate();
+    }
+
+    private static Icon MakeTrayIcon()
+    {
+        var bmp = new Bitmap(16, 16);
+        using (var g = Graphics.FromImage(bmp))
+        {
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using var brush = new SolidBrush(COLOR_ACCENT);
+            g.FillEllipse(brush, 0, 0, 16, 16);
+            using var font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            using var textBrush = new SolidBrush(Color.White);
+            var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            g.DrawString("T", font, textBrush, new RectangleF(0, 0, 16, 16), sf);
+        }
+        return Icon.FromHandle(bmp.GetHicon());
     }
 
     // === Расчёт статистики для аналитики ===
