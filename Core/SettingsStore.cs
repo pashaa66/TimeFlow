@@ -88,6 +88,7 @@ namespace TimeFlow
                 if (eq < 0) continue;
                 string key = l.Substring(0, eq).Trim();
                 string val = l.Substring(eq + 1).Trim();
+                if (key == "items") key = "categories";
                 _data[key] = val;
             }
             foreach (var kv in new Dictionary<string, string>(_data)) { }
@@ -113,7 +114,7 @@ namespace TimeFlow
                 sw.WriteLine($"virtual_time_ratio={Get("virtual_time_ratio")}");
                 sw.WriteLine();
                 sw.WriteLine("[Categories]");
-                sw.WriteLine($"items={Get("categories")}");
+                sw.WriteLine($"categories={Get("categories")}");
                 return true;
             }
             catch { return false; }
