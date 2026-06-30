@@ -8,25 +8,21 @@ namespace TimeFlow.UI;
 
 public class TasksPanel : UserControl
 {
-    // Цвета темы
     private static readonly Color COLOR_SURFACE = Color.FromArgb(45, 45, 45);
     private static readonly Color COLOR_BACKGROUND = Color.FromArgb(30, 30, 30);
     private static readonly Color COLOR_TEXT_PRIMARY = Color.FromArgb(220, 220, 220);
     private static readonly Color COLOR_ACCENT = Color.FromArgb(76, 175, 80);
 
-    // Элементы UI
     private TableLayoutPanel? _toolbar;
     private Button? _btnAdd;
     private ComboBox? _cmbFilter;
     private FlowLayoutPanel? _flowList;
     private Label? _lblEmptyState;
 
-    // Данные
     private List<TaskItem> _tasks = new();
     private SettingsStore? _settings;
     private bool _suppressFilterEvent = false;
 
-    // События для MainForm
     public event EventHandler<TaskItem>? TaskStartRequested;
     public event EventHandler<TaskItem>? TaskStopRequested;
     public event EventHandler<TaskItem>? TaskDoneRequested;
@@ -43,6 +39,11 @@ public class TasksPanel : UserControl
         _settings = settings;
         RefreshFilters();
         RefreshList();
+    }
+
+    public void RefreshCategories()
+    {
+        RefreshFilters();
     }
 
     public void SetTasks(List<TaskItem> tasks)
@@ -69,7 +70,6 @@ public class TasksPanel : UserControl
         this.Dock = DockStyle.Fill;
         this.BackColor = COLOR_BACKGROUND;
 
-        // === Toolbar: TableLayoutPanel ===
         _toolbar = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
@@ -112,7 +112,6 @@ public class TasksPanel : UserControl
         _toolbar.Controls.Add(_btnAdd, 0, 0);
         _toolbar.Controls.Add(_cmbFilter, 1, 0);
 
-        // === Список карточек: FlowLayoutPanel ===
         _flowList = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -124,7 +123,6 @@ public class TasksPanel : UserControl
             Margin = new Padding(0)
         };
 
-        // Пустое состояние
         _lblEmptyState = new Label
         {
             Text = "Нет задач. Нажмите «+ Новая задача»",
@@ -135,7 +133,6 @@ public class TasksPanel : UserControl
             Margin = new Padding(20, 40, 20, 0)
         };
 
-        // Порядок добавления: сначала Fill, потом Top.
         this.Controls.Add(_flowList);
         this.Controls.Add(_toolbar);
     }
@@ -149,6 +146,8 @@ public class TasksPanel : UserControl
     private void RefreshFilters()
     {
         if (_cmbFilter == null) return;
+
+        string? prevSelected = _cmbFilter.SelectedItem?.ToString();
 
         _suppressFilterEvent = true;
         try
@@ -167,7 +166,11 @@ public class TasksPanel : UserControl
             {
                 _cmbFilter.Items.AddRange(new object[] { "Учёба", "Работа", "Отдых" });
             }
-            _cmbFilter.SelectedIndex = 0;
+
+            if (prevSelected != null && _cmbFilter.Items.Contains(prevSelected))
+                _cmbFilter.SelectedItem = prevSelected;
+            else
+                _cmbFilter.SelectedIndex = 0;
         }
         finally
         {
@@ -189,7 +192,6 @@ public class TasksPanel : UserControl
             ? new List<TaskItem>(_tasks)
             : _tasks.FindAll(t => t.Category == filter);
 
-        // Сортировка: запущенные наверх, потом по убыванию 
         filtered.Sort((a, b) =>
         {
             if (a.Running && !b.Running) return -1;

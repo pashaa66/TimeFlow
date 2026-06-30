@@ -17,9 +17,9 @@ public class HistoryForm : Form
     private static readonly Color COLOR_ACCENT = Color.FromArgb(76, 175, 80);
     private static readonly Color COLOR_BORDER = Color.FromArgb(60, 60, 60);
 
-    private static readonly Color STATUS_DONE = Color.FromArgb(76, 175, 80);   
-    private static readonly Color STATUS_REMOVED = Color.FromArgb(244, 67, 54); 
-    private static readonly Color STATUS_ACTIVE = Color.FromArgb(255, 152, 0);  
+    private static readonly Color STATUS_DONE = Color.FromArgb(76, 175, 80);
+    private static readonly Color STATUS_DELETED = Color.FromArgb(244, 67, 54);
+    private static readonly Color STATUS_ACTIVE = Color.FromArgb(255, 152, 0);
 
     private ComboBox? _cmbFilter;
     private FlowLayoutPanel? _flowList;
@@ -196,7 +196,18 @@ public class HistoryForm : Form
         {
             _cmbFilter.Items.Clear();
             _cmbFilter.Items.Add("Все категории");
-            foreach (var cat in _settings!.Categories().Keys)
+
+            var cats = new HashSet<string>(StringComparer.Ordinal);
+            if (_settings != null)
+            {
+                foreach (var c in _settings.Categories().Keys) cats.Add(c);
+            }
+            foreach (var r in _allRecords)
+            {
+                if (!string.IsNullOrEmpty(r.Category)) cats.Add(r.Category);
+            }
+
+            foreach (var cat in cats.OrderBy(c => c, StringComparer.Ordinal))
                 _cmbFilter.Items.Add(cat);
             _cmbFilter.SelectedIndex = 0;
         }
@@ -251,7 +262,7 @@ public class HistoryForm : Form
 
         var panel = new Panel
         {
-            Height = 64,
+            Height = 84,
             Width = _flowList!.ClientSize.Width - 25,
             BackColor = COLOR_SURFACE,
             Margin = new Padding(0, 0, 0, 8),
@@ -261,7 +272,7 @@ public class HistoryForm : Form
         Color statusColor = record.Status switch
         {
             "done" => STATUS_DONE,
-            "deleted" => STATUS_REMOVED,
+            "deleted" => STATUS_DELETED,
             _ => STATUS_ACTIVE
         };
 
@@ -312,20 +323,34 @@ public class HistoryForm : Form
             Margin = new Padding(0, 0, 0, 0)
         };
 
+        var lblCreated = new Label
+        {
+            AutoSize = true,
+            ForeColor = COLOR_TEXT_SECONDARY,
+            Font = new Font("Segoe UI", 8, FontStyle.Regular),
+            Text = "Дата создания: " + FormatCreatedAt(record.CreatedAt),
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0, 2, 0, 0),
+            BackColor = COLOR_SURFACE
+        };
+
         var content = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 2,
+            RowCount = 3,
             BackColor = COLOR_SURFACE,
             Margin = new Padding(0),
             Padding = new Padding(10, 4, 10, 4)
         };
-        content.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
-        content.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
+        content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        content.RowStyles.Add(new RowStyle(SizeType.Absolute, 28F));  // info
+        content.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));  // category
+        content.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F));  // created (НОВОЕ)
 
         content.Controls.Add(lblInfo, 0, 0);
         content.Controls.Add(lblCategory, 0, 1);
+        content.Controls.Add(lblCreated, 0, 2);
 
         panel.Controls.Add(content);
         panel.Controls.Add(statusBar);
@@ -333,5 +358,13 @@ public class HistoryForm : Form
         panel.Width = Math.Max(100, _flowList!.ClientSize.Width - 25);
 
         return panel;
+    }
+
+    private static string FormatCreatedAt(string? createdAt)
+    {
+        if (string.IsNullOrEmpty(createdAt)) return "--";
+        if (DateTime.TryParse(createdAt, out var dt))
+            return dt.ToString("dd.MM.yyyy, HH:mm:ss");
+        return createdAt;
     }
 }

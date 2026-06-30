@@ -1,5 +1,6 @@
 using System;
 using System.Windows.Forms;
+using TimeFlow;
 using TimeFlow.UI;
 
 static class Program
@@ -9,12 +10,12 @@ static class Program
     {
         // Перехватываем все скрытые ошибки WinForms
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-        Application.ThreadException += (s, e) => 
+        Application.ThreadException += (s, e) =>
         {
             MessageBox.Show(e.Exception.ToString(), "Ошибка UI потока", MessageBoxButtons.OK, MessageBoxIcon.Error);
             Environment.Exit(1);
         };
-        AppDomain.CurrentDomain.UnhandledException += (s, e) => 
+        AppDomain.CurrentDomain.UnhandledException += (s, e) =>
         {
             MessageBox.Show(e.ExceptionObject.ToString(), "Критическая ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             Environment.Exit(1);

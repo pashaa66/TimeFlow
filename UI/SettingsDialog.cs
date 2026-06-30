@@ -292,7 +292,7 @@ public class SettingsDialog : Form
         };
         num.ValueChanged += (_, _) =>
         {
-            // Локальный буфер обновится в OnSave (перечитываем из контрола).
+
         };
 
         card.Controls.Add(lbl, 0, row);

@@ -18,7 +18,7 @@ namespace TimeFlow
         public string Id { get; set; }
         public string Name { get; set; }
         public string Category { get; set; }
-        public int EstimatedMinutes { get; set; }
+        public int EstimatedSeconds { get; set; }
         public bool Done { get; set; }
         public string CreatedAt { get; set; }
         public string CompletedAt { get; set; }
@@ -28,10 +28,10 @@ namespace TimeFlow
 
         public TaskItem() { Id = Guid.NewGuid().ToString("N"); CreatedAt = Config.NowIso(); }
 
-        public TaskItem(string name, string category, int estimatedMinutes)
+        public TaskItem(string name, string category, int estimatedSeconds)
         {
             Id = Guid.NewGuid().ToString("N");
-            Name = name; Category = category; EstimatedMinutes = estimatedMinutes;
+            Name = name; Category = category; EstimatedSeconds = estimatedSeconds;
             CreatedAt = Config.NowIso();
         }
 
@@ -74,7 +74,7 @@ namespace TimeFlow
         public string Id { get; set; }
         public string Name { get; set; }
         public string Category { get; set; }
-        public int EstimatedMinutes { get; set; }
+        public int EstimatedSeconds { get; set; }
         public string CreatedAt { get; set; }
         public string CompletedAt { get; set; }
         public string RemovedAt { get; set; }
@@ -91,7 +91,7 @@ namespace TimeFlow
             return new HistoryRecord
             {
                 Id = t.Id, Name = t.Name, Category = t.Category,
-                EstimatedMinutes = t.EstimatedMinutes,
+                EstimatedSeconds = t.EstimatedSeconds,
                 CreatedAt = t.CreatedAt, CompletedAt = t.CompletedAt,
                 RemovedAt = "", Status = status,
                 TotalSeconds = t.ElapsedSeconds(clock),
