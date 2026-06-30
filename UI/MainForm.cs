@@ -48,6 +48,8 @@ public partial class MainForm : Form
 
     private readonly System.Windows.Forms.Timer _uiTimer = new() { Interval = 1000 };
 
+    private MiniTimerForm? _miniTimer;
+
     private bool _isAdjustingSplitter = false;
 
     public MainForm(SettingsStore settings, VirtualClock clock,
@@ -65,6 +67,7 @@ public partial class MainForm : Form
         StartUiTimer();       
         UpdatePomodoroDisplay();
         UpdateVTimeDisplay();
+        InitMiniTimer();
 
         this.Load += OnFormLoad;
     }
@@ -104,7 +107,6 @@ public partial class MainForm : Form
             _btnVTimeToggle.Click += (_, _) => ToggleVirtualTime();
         }
 
-        // --- Splitter ---
         if (_mainSplit != null)
             _mainSplit.SplitterMoved += OnSplitterMoved;
     }
@@ -119,6 +121,7 @@ public partial class MainForm : Form
                 if (this.IsDisposed) return;
                 _tasksPanel?.SetTasks(_tasks.Tasks.ToList());
                 RefreshAnalytics();
+                _miniTimer?.RefreshTasks(_tasks.Tasks);
             }));
         }
         catch (InvalidOperationException) { }
@@ -134,6 +137,7 @@ public partial class MainForm : Form
                 if (this.IsDisposed) return;
                 _tasksPanel?.SetTasks(_tasks.Tasks.ToList());
                 RefreshAnalytics();
+                _miniTimer?.RefreshTasks(_tasks.Tasks);
             }));
         }
         catch (InvalidOperationException) { }
@@ -215,6 +219,8 @@ public partial class MainForm : Form
                 }
                 UpdatePomodoroDisplay();
                 UpdateVTimeDisplay();
+
+                _miniTimer?.RefreshTasks(_tasks.Tasks);
             }
             catch (InvalidOperationException) { }
         };
@@ -362,6 +368,8 @@ public partial class MainForm : Form
             RefreshAnalytics();
 
             UpdateVTimeDisplay();
+
+            ApplyMiniTimerVisibility();
         };
         _topBar.Controls.Add(btnSettings, 3, 0);
         var btnHistory = new Button
@@ -619,7 +627,6 @@ public partial class MainForm : Form
         catch (InvalidOperationException) { }
     }
 
-    // === OnSizeChanged (T4.2) ===
     protected override void OnSizeChanged(EventArgs e)
     {
         base.OnSizeChanged(e);
@@ -672,12 +679,77 @@ public partial class MainForm : Form
             _uiTimer.Stop();
             _pomodoro.Stop();
             _clock.Stop();
+            try { _miniTimer?.Close(); _miniTimer?.Dispose(); _miniTimer = null; }
+            catch { /* не блокируем закрытие формы */ }
             try { _tasks.SaveTasks(); }
             catch { /* не блокируем закрытие формы */ }
         }
         catch { /* не блокируем закрытие формы */ }
 
         base.OnFormClosing(e);
+    }
+
+    private void InitMiniTimer()
+    {
+        _miniTimer = new MiniTimerForm(_settings, _clock);
+
+        _miniTimer.StartClicked   += (_, t) => _tasks.StartTask(t.Id);
+        _miniTimer.StopClicked    += (_, t) => _tasks.StopTask(t.Id);
+        _miniTimer.DoneClicked    += (_, t) => _tasks.CompleteTask(t.Id);
+        _miniTimer.DeleteClicked  += (_, t) => _tasks.RemoveTask(t.Id);
+        _miniTimer.Clicked        += (_, t) =>
+        {
+            try
+            {
+                if (this.WindowState == FormWindowState.Minimized)
+                    this.WindowState = FormWindowState.Normal;
+                this.Activate();
+            }
+            catch { /* игнорируем */ }
+        };
+
+        try
+        {
+            var screen = Screen.PrimaryScreen?.WorkingArea
+                ?? SystemInformation.WorkingArea;
+            _miniTimer.Location = new Point(screen.Right - _miniTimer.Width - 20,
+                                           screen.Top + 20);
+        }
+        catch { /* позиция по умолчанию */ }
+
+        this.Resize += OnMainFormResize;
+        this.SizeChanged += (_, _) => ApplyMiniTimerVisibility();
+    }
+
+    private void OnMainFormResize(object? sender, EventArgs e)
+    {
+        ApplyMiniTimerVisibility();
+    }
+
+    private void ApplyMiniTimerVisibility()
+    {
+        if (_miniTimer == null) return;
+
+        bool enabled = _settings.GetBool("mini_timer_enabled", true);
+        if (!enabled)
+        {
+            if (_miniTimer.Visible) _miniTimer.Hide();
+            return;
+        }
+
+        bool mainMinimized = (this.WindowState == FormWindowState.Minimized);
+        if (mainMinimized)
+        {
+            if (!_miniTimer.Visible)
+            {
+                _miniTimer.Show(this);
+                _miniTimer.RefreshTasks(_tasks.Tasks);
+            }
+        }
+        else
+        {
+            if (_miniTimer.Visible) _miniTimer.Hide();
+        }
     }
 
     private void ApplyDarkTheme()
@@ -687,7 +759,6 @@ public partial class MainForm : Form
         this.Text = "TimeFlow";
     }
 
-    // === Расчёт статистики для аналитики ===
     private void RefreshAnalytics()
     {
         if (_analyticsPanel == null) return;
