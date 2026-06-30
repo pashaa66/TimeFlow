@@ -32,6 +32,7 @@ public class SettingsDialog : Form
     private int _pomodoroCyclesUntilLong;
     private bool _virtualTimeEnabled;
     private double _virtualTimeRatio;
+    private bool _miniTimerEnabled;       // НОВОЕ: показывать плавающий виджет
     private readonly Dictionary<string, string> _editedCategories;
     private string _selectedColorHex = Config.ColorPalette[0];
 
@@ -46,6 +47,8 @@ public class SettingsDialog : Form
 
     private CheckBox? _chkVirtualTime;
     private NumericUpDown? _numVirtualRatio;
+
+    private CheckBox? _chkMiniTimer;   // НОВОЕ: чекбокс плавающего виджета
 
     private FlowLayoutPanel? _categoriesList;
     private TextBox? _txtNewCategoryName;
@@ -66,6 +69,7 @@ public class SettingsDialog : Form
         _pomodoroCyclesUntilLong = _settings.GetInt("pomodoro_cycles_until_long", 4);
         _virtualTimeEnabled = _settings.GetBool("virtual_time_enabled");
         _virtualTimeRatio = _settings.GetDouble("virtual_time_ratio", 1.0);
+        _miniTimerEnabled = _settings.GetBool("mini_timer_enabled", true);  // НОВОЕ: по умолчанию ВКЛ
         _editedCategories = new Dictionary<string, string>(_settings.Categories());
 
         InitializeLayout();
@@ -130,11 +134,15 @@ public class SettingsDialog : Form
         innerStack.RowStyles.Add(new RowStyle(SizeType.AutoSize));   // 6: "3. Виртуальное время"
         innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 100F)); // 7: vtime card
         innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 8F));   // 8: gap
-        innerStack.RowCount = 13;
+        innerStack.RowCount = 17;
         innerStack.RowStyles.Add(new RowStyle(SizeType.AutoSize));   // 9: "4. Категории"
         innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 520F)); // 10: categories card
         innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 8F));   // 11: gap
         innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 0F));   // 12: reserve
+        innerStack.RowStyles.Add(new RowStyle(SizeType.AutoSize));   // 13: "5. Плавающий виджет"
+        innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 80F));  // 14: mini-timer card
+        innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 8F));   // 15: gap
+        innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 0F));   // 16: reserve
 
         innerStack.Controls.Add(MakeHeader("1. Заработок"), 0, 0);
         innerStack.Controls.Add(BuildEarningsCard(), 0, 1);
@@ -147,6 +155,9 @@ public class SettingsDialog : Form
 
         innerStack.Controls.Add(MakeHeader("4. Настройка категорий"), 0, 9);
         innerStack.Controls.Add(BuildCategoriesCard(), 0, 10);
+
+        innerStack.Controls.Add(MakeHeader("5. Плавающий виджет"), 0, 13);
+        innerStack.Controls.Add(BuildMiniTimerCard(), 0, 14);
 
         scrollPanel.Controls.Add(innerStack);
         root.Controls.Add(scrollPanel, 0, 0);
@@ -358,6 +369,40 @@ public class SettingsDialog : Form
         card.Controls.Add(_chkVirtualTime, 1, 0);
         card.Controls.Add(lblRatio, 0, 1);
         card.Controls.Add(_numVirtualRatio, 1, 1);
+
+        return card;
+    }
+
+    // Плавающий виджет (мини-таймер) 
+    private TableLayoutPanel BuildMiniTimerCard()
+    {
+        var card = MakeCardContainer(1);
+        card.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+
+        var lblMiniTimer = new Label
+        {
+            Text = "Показывать плавающий мини-таймер:",
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI", 10F),
+            ForeColor = COLOR_TEXT_PRIMARY,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0, 4, 12, 4)
+        };
+
+        _chkMiniTimer = new CheckBox
+        {
+            Dock = DockStyle.Fill,
+            Checked = _miniTimerEnabled,
+            BackColor = COLOR_CARD,
+            ForeColor = COLOR_TEXT_PRIMARY,
+            Font = new Font("Segoe UI", 10F),
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0, 4, 0, 4)
+        };
+        _chkMiniTimer.CheckedChanged += (_, _) => _miniTimerEnabled = _chkMiniTimer.Checked;
+
+        card.Controls.Add(lblMiniTimer, 0, 0);
+        card.Controls.Add(_chkMiniTimer, 1, 0);
 
         return card;
     }
@@ -796,6 +841,7 @@ public class SettingsDialog : Form
         if (_numCyclesUntilLong != null) _pomodoroCyclesUntilLong = (int)_numCyclesUntilLong.Value;
         if (_chkVirtualTime != null) _virtualTimeEnabled = _chkVirtualTime.Checked;
         if (_numVirtualRatio != null) _virtualTimeRatio = (double)_numVirtualRatio.Value;
+        if (_chkMiniTimer != null) _miniTimerEnabled = _chkMiniTimer.Checked;
         if (_txtCurrency != null) _currency = _txtCurrency.Text;
 
         // Валидация
@@ -825,6 +871,7 @@ public class SettingsDialog : Form
             _settings.Set("pomodoro_cycles_until_long", _pomodoroCyclesUntilLong);
             _settings.Set("virtual_time_enabled", _virtualTimeEnabled);
             _settings.Set("virtual_time_ratio", _virtualTimeRatio.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            _settings.Set("mini_timer_enabled", _miniTimerEnabled);
 
             string catsJson = System.Text.Json.JsonSerializer.Serialize(_editedCategories);
             _settings.Set("categories", catsJson);
