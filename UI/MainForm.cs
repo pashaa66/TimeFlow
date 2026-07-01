@@ -360,7 +360,7 @@ public partial class MainForm : Form
         };
         btnSettings.Click += (_, _) =>
         {
-            using var settingsDialog = new SettingsDialog(_settings);
+            using var settingsDialog = new SettingsDialog(_settings, _tasks); 
             settingsDialog.ShowDialog(this);
             _pomodoro.ReloadSettings();
             bool vEnabled = _settings.GetBool("virtual_time_enabled");
