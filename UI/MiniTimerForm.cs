@@ -29,7 +29,6 @@ public class MiniTimerForm : Form
     private readonly VirtualClock _clock;
 
     private readonly TableLayoutPanel _cardsLayout;
-
     private readonly Label _emptyState;
 
     private readonly Dictionary<string, Color> _catColors = new();
@@ -42,14 +41,11 @@ public class MiniTimerForm : Form
     private const int SB_HORZ = 0;
     private const int SB_VERT = 1;
 
-    public event EventHandler<TaskItem>? Clicked;
+    public event EventHandler<TaskItem?>? Clicked;
 
     public event EventHandler<TaskItem>? StartClicked;
-
     public event EventHandler<TaskItem>? StopClicked;
-
     public event EventHandler<TaskItem>? DoneClicked;
-
     public event EventHandler<TaskItem>? DeleteClicked;
 
     public MiniTimerForm(SettingsStore settings, VirtualClock clock)
@@ -106,6 +102,10 @@ public class MiniTimerForm : Form
         HookDragEvents(_cardsLayout);
         HookDragEvents(_emptyState);
 
+        this.Click += (_, _) => Clicked?.Invoke(this, null);
+        _emptyState.Click += (_, _) => Clicked?.Invoke(this, null);
+        _cardsLayout.Click += (_, _) => Clicked?.Invoke(this, null);
+
         _cardsLayout.Layout += (_, _) => HideHorizontalScrollbar();
         _cardsLayout.Scroll += (_, _) => HideHorizontalScrollbar();
 
@@ -138,7 +138,6 @@ public class MiniTimerForm : Form
     {
         if (e.Button != MouseButtons.Left) return;
         if (sender is Button) return;
-
         _dragging = true;
         Point screen = Cursor.Position;
         _dragOffset = new Point(screen.X - this.Left, screen.Y - this.Top);
@@ -213,7 +212,6 @@ public class MiniTimerForm : Form
             }
             else
             {
-               
                 AddCardAt(task, i);
             }
         }
@@ -229,7 +227,7 @@ public class MiniTimerForm : Form
             _clock,
             CARD_WIDTH,
             CARD_HEIGHT,
-            OnCardClicked,
+            OnCardClicked, // Передаем одинарный клик
             OnCardStart,
             OnCardStop,
             OnCardDone,
@@ -458,7 +456,7 @@ public class MiniTimerForm : Form
 
             this.Controls.Add(_layout);
 
-            HookClick(this);
+            HookClick(this); 
 
             RefreshCard(task, clock, catColor);
         }

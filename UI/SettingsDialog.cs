@@ -50,10 +50,10 @@ public class SettingsDialog : Form
     private NumericUpDown? _numVirtualRatio;
 
     private CheckBox? _chkMiniTimer;   
-	
-	private NumericUpDown? _numYear;
-	private NumericUpDown? _numMonth;
-	private Button? _btnExport;
+
+    private NumericUpDown? _numYear;
+    private NumericUpDown? _numMonth;
+    private Button? _btnExport;
 
     private FlowLayoutPanel? _categoriesList;
     private TextBox? _txtNewCategoryName;
@@ -83,7 +83,6 @@ public class SettingsDialog : Form
         SelectColor(_selectedColorHex);
     }
 
-    // Каркас формы 
     private void InitializeLayout()
     {
         this.Text = "Настройки";
