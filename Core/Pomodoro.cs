@@ -19,6 +19,9 @@ namespace TimeFlow
         private int _completedWorks;
         private int _workSec, _breakSec, _longBreakSec, _cyclesUntilLong;
 
+        private double _realStartUnix = 0;
+        private int _remainingAtStart = 0;
+
         public event Action<int> Tick;
         public event Action<string> PhaseChanged;
         public event Action<string> FinishedPhase;
@@ -27,10 +30,26 @@ namespace TimeFlow
         {
             _settings = settings;
             _clock = clock;
+            _clock.ConfigChanged += OnClockConfigChanged;
             _timer = new System.Timers.Timer(1000);
             _timer.Elapsed += (s, e) => OnTick();
             Configure();
             Remaining = _workSec;
+        }
+
+        private void OnClockConfigChanged()
+        {
+            if (!Running) return;
+
+            double realNow = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            double realElapsed = realNow - _realStartUnix;
+
+            Remaining = Math.Max(0, _remainingAtStart - (int)realElapsed);
+
+            _realStartUnix = realNow;
+            _remainingAtStart = Remaining;
+
+            Tick?.Invoke(Remaining);
         }
 
         private void Configure()
@@ -54,6 +73,8 @@ namespace TimeFlow
             Running = false;
             Phase = PhaseWork;
             Remaining = _workSec;
+            _realStartUnix = 0;
+            _remainingAtStart = 0;
             Tick?.Invoke(Remaining);
             PhaseChanged?.Invoke(Phase);
         }
@@ -64,6 +85,8 @@ namespace TimeFlow
             Configure();
             if (Remaining <= 0) { Remaining = _workSec; Phase = PhaseWork; }
             Running = true;
+            _realStartUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            _remainingAtStart = Remaining;
             _timer.Start();
             Tick?.Invoke(Remaining);
             PhaseChanged?.Invoke(Phase);
@@ -78,10 +101,14 @@ namespace TimeFlow
 
         private void OnTick()
         {
-            int step = (_clock.Enabled && _clock.Ratio > 1)
-                ? (int)Math.Max(1, Math.Round(_clock.Ratio))
-                : 1;
-            Remaining -= step;
+            double realNow = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            double realElapsed = realNow - _realStartUnix;
+            double virtualElapsed = _clock.Enabled
+                ? realElapsed * _clock.Ratio
+                : realElapsed;
+
+            Remaining = Math.Max(0, _remainingAtStart - (int)virtualElapsed);
+
             if (Remaining <= 0)
             {
                 Remaining = 0;
