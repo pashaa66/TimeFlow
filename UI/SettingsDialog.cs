@@ -32,7 +32,7 @@ public class SettingsDialog : Form
     private int _pomodoroCyclesUntilLong;
     private bool _virtualTimeEnabled;
     private double _virtualTimeRatio;
-    private bool _miniTimerEnabled;       // НОВОЕ: показывать плавающий виджет
+    private bool _miniTimerEnabled;       
     private readonly Dictionary<string, string> _editedCategories;
     private string _selectedColorHex = Config.ColorPalette[0];
 
@@ -48,7 +48,7 @@ public class SettingsDialog : Form
     private CheckBox? _chkVirtualTime;
     private NumericUpDown? _numVirtualRatio;
 
-    private CheckBox? _chkMiniTimer;   // НОВОЕ: чекбокс плавающего виджета
+    private CheckBox? _chkMiniTimer;   
 
     private FlowLayoutPanel? _categoriesList;
     private TextBox? _txtNewCategoryName;
@@ -69,7 +69,7 @@ public class SettingsDialog : Form
         _pomodoroCyclesUntilLong = _settings.GetInt("pomodoro_cycles_until_long", 4);
         _virtualTimeEnabled = _settings.GetBool("virtual_time_enabled");
         _virtualTimeRatio = _settings.GetDouble("virtual_time_ratio", 1.0);
-        _miniTimerEnabled = _settings.GetBool("mini_timer_enabled", true);  // НОВОЕ: по умолчанию ВКЛ
+        _miniTimerEnabled = _settings.GetBool("mini_timer_enabled", true);  
         _editedCategories = new Dictionary<string, string>(_settings.Categories());
 
         InitializeLayout();
@@ -77,7 +77,6 @@ public class SettingsDialog : Form
         SelectColor(_selectedColorHex);
     }
 
-    // Каркас формы 
     private void InitializeLayout()
     {
         this.Text = "Настройки";

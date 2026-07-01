@@ -92,7 +92,18 @@ public partial class MainForm : Form
             _tasksPanel.TaskStartRequested += (_, task) => _tasks.StartTask(task.Id);
             _tasksPanel.TaskStopRequested += (_, task) => _tasks.StopTask(task.Id);
             _tasksPanel.TaskDoneRequested += (_, task) => _tasks.CompleteTask(task.Id);
-            _tasksPanel.TaskDeleteRequested += (_, task) => _tasks.RemoveTask(task.Id);
+            _tasksPanel.TaskDeleteRequested += (_, task) =>
+            {
+                var result = MessageBox.Show(
+                    this,
+                    $"Вы действительно хотите удалить задачу \"{task.Name}\"?",
+                    "Подтверждение удаления",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question,
+                    MessageBoxDefaultButton.Button2);
+                if (result == DialogResult.Yes)
+                    _tasks.RemoveTask(task.Id);
+            };
             _tasksPanel.AddTaskRequested += (_, _) => ShowAddTaskDialog();
         }
 
@@ -707,8 +718,19 @@ public partial class MainForm : Form
         _miniTimer.StartClicked   += (_, t) => _tasks.StartTask(t.Id);
         _miniTimer.StopClicked    += (_, t) => _tasks.StopTask(t.Id);
         _miniTimer.DoneClicked    += (_, t) => _tasks.CompleteTask(t.Id);
-        _miniTimer.DeleteClicked  += (_, t) => _tasks.RemoveTask(t.Id);
-        _miniTimer.Clicked        += (_, t) =>
+        _miniTimer.DeleteClicked  += (_, t) =>
+        {
+            var result = MessageBox.Show(
+                _miniTimer,
+                $"Вы действительно хотите удалить задачу \"{t.Name}\"?",
+                "Подтверждение удаления",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question,
+                MessageBoxDefaultButton.Button2);
+            if (result == DialogResult.Yes)
+                _tasks.RemoveTask(t.Id);
+        };
+        _miniTimer.Clicked  += (_, t) =>
         {
             try
             {
