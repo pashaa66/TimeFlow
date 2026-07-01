@@ -637,9 +637,7 @@ public partial class MainForm : Form
         base.OnSizeChanged(e);
 
         if (WindowState == FormWindowState.Minimized){
-            this.ShowInTaskbar = false;
-            Hide();
-            _trayIcon?.ShowBalloonTip(2000, "TimeFlow", "Приложение свёрнуто в трей", ToolTipIcon.Info);
+            ApplyMiniTimerVisibility();
         }
 
         if (_mainSplit == null || _isAdjustingSplitter) return;
@@ -754,7 +752,8 @@ public partial class MainForm : Form
         {
             if (!_miniTimer.Visible)
             {
-                _miniTimer.Show(this);
+                
+                _miniTimer.Show(); 
                 _miniTimer.RefreshTasks(_tasks.Tasks);
             }
         }
