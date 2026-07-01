@@ -637,6 +637,7 @@ public partial class MainForm : Form
         base.OnSizeChanged(e);
 
         if (WindowState == FormWindowState.Minimized){
+            this.ShowInTaskbar = false;
             Hide();
             _trayIcon?.ShowBalloonTip(2000, "TimeFlow", "Приложение свёрнуто в трей", ToolTipIcon.Info);
         }
@@ -690,7 +691,7 @@ public partial class MainForm : Form
             _uiTimer.Stop();
             _pomodoro.Stop();
             _clock.Stop();
-            try { _miniTimer?.Close(); _miniTimer?.Dispose(); _miniTimer = null; }
+            try { _miniTimer?.Dispose(); _miniTimer = null; }
             catch { /* не блокируем закрытие формы */ }
             try { _tasks.SaveTasks(); }
             catch { /* не блокируем закрытие формы */ }
@@ -782,7 +783,23 @@ public partial class MainForm : Form
 
         var menu = new ContextMenuStrip();
         menu.Items.Add("Открыть", null, (_, _) => RestoreFromTray());
-        menu.Items.Add("Выход", null, (_, _) => { _trayIcon!.Visible = false; Application.Exit(); });
+       menu.Items.Add("Выход", null, (_, _) =>
+        {
+            try
+            {
+                _uiTimer.Stop();
+                _pomodoro.Stop();
+                _clock.Stop();
+                _tasks.SaveTasks();
+            }
+            catch { /* игнорируем ошибки при сохранении */ }
+
+            _trayIcon!.Visible = false;
+            _trayIcon.Dispose();
+
+
+            Environment.Exit(0);
+        });
         _trayIcon.ContextMenuStrip = menu;
 
         _trayIcon.DoubleClick += (_, _) => RestoreFromTray();
@@ -790,6 +807,7 @@ public partial class MainForm : Form
 
     private void RestoreFromTray()
     {
+        this.ShowInTaskbar = true;
         Show();
         WindowState = FormWindowState.Normal;
         Activate();
