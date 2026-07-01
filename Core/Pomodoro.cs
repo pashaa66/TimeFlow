@@ -9,6 +9,7 @@ namespace TimeFlow
         public const string PhaseLongBreak = "long_break";
 
         private readonly SettingsStore _settings;
+        private readonly VirtualClock _clock;
         private readonly System.Timers.Timer _timer;
 
         public bool Running { get; private set; }
@@ -22,9 +23,10 @@ namespace TimeFlow
         public event Action<string> PhaseChanged;
         public event Action<string> FinishedPhase;
 
-        public PomodoroTimer(SettingsStore settings)
+        public PomodoroTimer(SettingsStore settings, VirtualClock clock)
         {
             _settings = settings;
+            _clock = clock;
             _timer = new System.Timers.Timer(1000);
             _timer.Elapsed += (s, e) => OnTick();
             Configure();
@@ -76,9 +78,13 @@ namespace TimeFlow
 
         private void OnTick()
         {
-            Remaining -= 1;
+            int step = (_clock.Enabled && _clock.Ratio > 1)
+                ? (int)Math.Max(1, Math.Round(_clock.Ratio))
+                : 1;
+            Remaining -= step;
             if (Remaining <= 0)
             {
+                Remaining = 0;
                 _timer.Stop();
                 Running = false;
                 AdvancePhase();

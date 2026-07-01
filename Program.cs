@@ -28,7 +28,7 @@ static class Program
             var settings = new SettingsStore();
             var clock = new VirtualClock();
             var tasks = new TaskManager(settings, clock);
-            var pomodoro = new PomodoroTimer(settings);
+            var pomodoro = new PomodoroTimer(settings, clock);
             clock.Start();
             Application.Run(new MainForm(settings, clock, tasks, pomodoro));
         }
