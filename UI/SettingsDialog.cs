@@ -22,6 +22,7 @@ public class SettingsDialog : Form
 
     // Ядро
     private readonly SettingsStore _settings;
+	private readonly TaskManager _taskManager;
 
     // Локальные буферы
     private string _currency;
@@ -50,6 +51,10 @@ public class SettingsDialog : Form
 
     private CheckBox? _chkMiniTimer;   
 
+    private NumericUpDown? _numYear;
+    private NumericUpDown? _numMonth;
+    private Button? _btnExport;
+
     private FlowLayoutPanel? _categoriesList;
     private TextBox? _txtNewCategoryName;
     private FlowLayoutPanel? _palettePanel;
@@ -57,9 +62,10 @@ public class SettingsDialog : Form
     private Label? _selectedColorDot;
     private readonly List<ColorDot> _paletteDots = new();
 
-    public SettingsDialog(SettingsStore settings)
+    public SettingsDialog(SettingsStore settings, TaskManager taskManager)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+		_taskManager = taskManager ?? throw new ArgumentNullException(nameof(taskManager));
 
         _currency = _settings.Get("currency", "₽");
         _hourlyRate = _settings.GetDouble("hourly_rate", 0);
@@ -133,7 +139,7 @@ public class SettingsDialog : Form
         innerStack.RowStyles.Add(new RowStyle(SizeType.AutoSize));   // 6: "3. Виртуальное время"
         innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 100F)); // 7: vtime card
         innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 8F));   // 8: gap
-        innerStack.RowCount = 17;
+        innerStack.RowCount = 20;
         innerStack.RowStyles.Add(new RowStyle(SizeType.AutoSize));   // 9: "4. Категории"
         innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 520F)); // 10: categories card
         innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 8F));   // 11: gap
@@ -142,6 +148,9 @@ public class SettingsDialog : Form
         innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 80F));  // 14: mini-timer card
         innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 8F));   // 15: gap
         innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 0F));   // 16: reserve
+		innerStack.RowStyles.Add(new RowStyle(SizeType.AutoSize));       // 17: "6. Экспорт данных"
+		innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 100F)); // 18: карточка экспорта
+		innerStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 8F));   // 19: отступ снизу
 
         innerStack.Controls.Add(MakeHeader("1. Заработок"), 0, 0);
         innerStack.Controls.Add(BuildEarningsCard(), 0, 1);
@@ -157,6 +166,9 @@ public class SettingsDialog : Form
 
         innerStack.Controls.Add(MakeHeader("5. Плавающий виджет"), 0, 13);
         innerStack.Controls.Add(BuildMiniTimerCard(), 0, 14);
+		
+		innerStack.Controls.Add(MakeHeader("6. Экспорт данных"), 0, 16); 
+		innerStack.Controls.Add(BuildExportCard(), 0, 17);
 
         scrollPanel.Controls.Add(innerStack);
         root.Controls.Add(scrollPanel, 0, 0);
@@ -371,6 +383,125 @@ public class SettingsDialog : Form
 
         return card;
     }
+	
+	private TableLayoutPanel BuildExportCard()
+	{
+		var card = MakeCardContainer(2);
+		card.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+		card.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
+
+		var lblExport = new Label
+		{
+			Text = "Экспорт отчета за месяц:",
+			Dock = DockStyle.Fill,
+			Font = new Font("Segoe UI", 10F),
+			ForeColor = COLOR_TEXT_PRIMARY,
+			TextAlign = ContentAlignment.MiddleLeft,
+			Margin = new Padding(0, 4, 12, 4)
+		};
+
+		var pnlSelectors = new FlowLayoutPanel
+		{
+			Dock = DockStyle.Fill,
+			FlowDirection = FlowDirection.LeftToRight,
+			WrapContents = false,
+			BackColor = COLOR_CARD,
+			Margin = new Padding(0)
+		};
+
+		var lblYear = new Label { Text = "Год:", AutoSize = true, ForeColor = COLOR_TEXT_PRIMARY, Margin = new Padding(0, 6, 4, 0), Font = new Font("Segoe UI", 10F) };
+		
+		_numYear = new NumericUpDown
+		{
+			Minimum = 2020, Maximum = 2100, Value = DateTime.Now.Year, Width = 70,
+			BackColor = COLOR_BACKGROUND, ForeColor = COLOR_TEXT_PRIMARY, Margin = new Padding(0, 0, 12, 0)
+		};
+
+		var lblMonth = new Label { Text = "Месяц:", AutoSize = true, ForeColor = COLOR_TEXT_PRIMARY, Margin = new Padding(0, 6, 4, 0), Font = new Font("Segoe UI", 10F) };
+		
+		_numMonth = new NumericUpDown
+		{
+			Minimum = 1, Maximum = 12, Value = DateTime.Now.Month, Width = 50,
+			BackColor = COLOR_BACKGROUND, ForeColor = COLOR_TEXT_PRIMARY, Margin = new Padding(0, 0, 12, 0)
+		};
+
+		pnlSelectors.Controls.Add(lblYear);
+		pnlSelectors.Controls.Add(_numYear);
+		pnlSelectors.Controls.Add(lblMonth);
+		pnlSelectors.Controls.Add(_numMonth);
+
+		card.Controls.Add(lblExport, 0, 0);
+		card.Controls.Add(pnlSelectors, 1, 0);
+
+		var lblSpacer = new Label { Dock = DockStyle.Fill };
+		
+		_btnExport = new Button
+		{
+			Text = "💾 Сохранить отчет",
+			Dock = DockStyle.Fill,
+			FlatStyle = FlatStyle.Flat,
+			BackColor = COLOR_ACCENT,
+			ForeColor = Color.White,
+			Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+			Cursor = Cursors.Hand,
+			Margin = new Padding(0, 4, 0, 4)
+		};
+		
+		_btnExport.Click += (_, _) =>
+		{
+			try
+			{
+				int year = (int)_numYear!.Value;
+				int month = (int)_numMonth!.Value;
+				
+				string path = _taskManager.ExportMonthReport(year, month);
+				
+				MessageBox.Show(this, 
+					$"Отчет успешно сохранен!\n\nПуть:\n{path}", 
+					"Экспорт данных", 
+					MessageBoxButtons.OK, 
+					MessageBoxIcon.Information);
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show(this, 
+					$"Ошибка при экспорте:\n{ex.Message}", 
+					"Ошибка", 
+					MessageBoxButtons.OK, 
+					MessageBoxIcon.Error);
+			}
+		};
+
+		card.Controls.Add(lblSpacer, 0, 1);
+		card.Controls.Add(_btnExport, 1, 1);
+
+		return card;
+	}
+
+	private void BtnExport_Click(object? sender, EventArgs e)
+	{
+		try
+		{
+			int year = (int)_numYear!.Value;
+			int month = (int)_numMonth!.Value;
+			
+			string path = _taskManager.ExportMonthReport(year, month);
+			
+			MessageBox.Show(this, 
+				$"Отчет успешно сохранен!\n\nПуть:\n{path}", 
+				"Экспорт данных", 
+				MessageBoxButtons.OK, 
+				MessageBoxIcon.Information);
+		}
+		catch (Exception ex)
+		{
+			MessageBox.Show(this, 
+				$"Ошибка при экспорте:\n{ex.Message}", 
+				"Ошибка", 
+				MessageBoxButtons.OK, 
+				MessageBoxIcon.Error);
+		}
+	}
 
     // Плавающий виджет (мини-таймер) 
     private TableLayoutPanel BuildMiniTimerCard()
