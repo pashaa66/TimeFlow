@@ -192,12 +192,16 @@ public class TasksPanel : UserControl
             ? new List<TaskItem>(_tasks)
             : _tasks.FindAll(t => t.Category == filter);
 
-        filtered.Sort((a, b) =>
-        {
-            if (a.Running && !b.Running) return -1;
-            if (!a.Running && b.Running) return 1;
-            return string.Compare(b.CreatedAt, a.CreatedAt, StringComparison.Ordinal);
-        });
+		filtered.Sort((a, b) =>
+		{
+			if (a.Done && !b.Done) return 1;
+			if (!a.Done && b.Done) return -1;
+			
+			if (a.Running && !b.Running) return -1;
+			if (!a.Running && b.Running) return 1;
+
+			return string.Compare(b.CreatedAt, a.CreatedAt, StringComparison.Ordinal);
+		});
 
         if (filtered.Count == 0)
         {
