@@ -12,8 +12,13 @@ namespace TimeFlow
         {
             if (!File.Exists(path)) return default;
             string raw = File.ReadAllText(path, Encoding.UTF8);
+            if (string.IsNullOrWhiteSpace(raw)) return default;
             using var doc = JsonDocument.Parse(raw);
             var obj = doc.RootElement;
+
+            if (obj.ValueKind != JsonValueKind.Object)
+                return obj.Clone();
+
             if (obj.TryGetProperty("enc", out var enc) && enc.GetBoolean() && obj.TryGetProperty("payload", out var payload))
             {
                 string key = passphrase ?? Crypto.DefaultPassphrase;

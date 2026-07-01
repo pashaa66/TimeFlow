@@ -1,18 +1,40 @@
-namespace TimeFlow;
-using TimeFlow.UI;
+using System;
 using System.Windows.Forms;
+using TimeFlow;
+using TimeFlow.UI;
 
 static class Program
 {
-    /// <summary>
-    ///  The main entry point for the application.
-    /// </summary>
     [STAThread]
     static void Main()
     {
-        // To customize application configuration such as set high DPI settings or default font,
-        // see https://aka.ms/applicationconfiguration.
-        ApplicationConfiguration.Initialize();
-        Application.Run(new MainForm());
-    }    
+        // Перехватываем все скрытые ошибки WinForms
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+        Application.ThreadException += (s, e) =>
+        {
+            MessageBox.Show(e.Exception.ToString(), "Ошибка UI потока", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            Environment.Exit(1);
+        };
+        AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+        {
+            MessageBox.Show(e.ExceptionObject.ToString(), "Критическая ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            Environment.Exit(1);
+        };
+
+        try
+        {
+            ApplicationConfiguration.Initialize();
+            Config.EnsureDirs();
+            var settings = new SettingsStore();
+            var clock = new VirtualClock();
+            var tasks = new TaskManager(settings, clock);
+            var pomodoro = new PomodoroTimer(settings, clock);
+            clock.Start();
+            Application.Run(new MainForm(settings, clock, tasks, pomodoro));
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.ToString(), "Ошибка запуска", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
 }

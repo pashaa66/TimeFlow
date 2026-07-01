@@ -18,7 +18,7 @@ namespace TimeFlow
         public string Id { get; set; }
         public string Name { get; set; }
         public string Category { get; set; }
-        public int EstimatedMinutes { get; set; }
+        public int EstimatedSeconds { get; set; }
         public bool Done { get; set; }
         public string CreatedAt { get; set; }
         public string CompletedAt { get; set; }
@@ -28,10 +28,10 @@ namespace TimeFlow
 
         public TaskItem() { Id = Guid.NewGuid().ToString("N"); CreatedAt = Config.NowIso(); }
 
-        public TaskItem(string name, string category, int estimatedMinutes)
+        public TaskItem(string name, string category, int estimatedSeconds)
         {
             Id = Guid.NewGuid().ToString("N");
-            Name = name; Category = category; EstimatedMinutes = estimatedMinutes;
+            Name = name; Category = category; EstimatedSeconds = estimatedSeconds;
             CreatedAt = Config.NowIso();
         }
 
@@ -41,7 +41,7 @@ namespace TimeFlow
             Sessions.Add(new Session { Start = DateTimeOffset.UtcNow.ToUnixTimeSeconds(), End = 0, Vsec = 0 });
         }
 
-        public void StopSession(VirtualClock clock = null)
+        public void StopSession(VirtualClock? clock = null)
         {
             double now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             foreach (var s in Sessions)
@@ -55,7 +55,7 @@ namespace TimeFlow
             }
         }
 
-        public double ElapsedSeconds(VirtualClock clock = null)
+        public double ElapsedSeconds(VirtualClock? clock = null)
         {
             double total = 0;
             double now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -74,7 +74,7 @@ namespace TimeFlow
         public string Id { get; set; }
         public string Name { get; set; }
         public string Category { get; set; }
-        public int EstimatedMinutes { get; set; }
+        public int EstimatedSeconds { get; set; }
         public string CreatedAt { get; set; }
         public string CompletedAt { get; set; }
         public string RemovedAt { get; set; }
@@ -91,7 +91,7 @@ namespace TimeFlow
             return new HistoryRecord
             {
                 Id = t.Id, Name = t.Name, Category = t.Category,
-                EstimatedMinutes = t.EstimatedMinutes,
+                EstimatedSeconds = t.EstimatedSeconds,
                 CreatedAt = t.CreatedAt, CompletedAt = t.CompletedAt,
                 RemovedAt = "", Status = status,
                 TotalSeconds = t.ElapsedSeconds(clock),

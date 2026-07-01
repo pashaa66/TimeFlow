@@ -46,11 +46,11 @@ namespace TimeFlow
         public void SaveHistory() =>
             JsonStore.Save(Config.HistoryFile, new { history = _history }, encrypt: true);
 
-        public TaskItem AddTask(string name, string category, int estimatedMinutes)
+        public TaskItem AddTask(string name, string category, int estimatedSeconds)
         {
             name = name?.Trim();
             if (string.IsNullOrEmpty(name)) return null;
-            var t = new TaskItem(name, category, estimatedMinutes < 0 ? 0 : estimatedMinutes);
+            var t = new TaskItem(name, category, estimatedSeconds < 0 ? 0 : estimatedSeconds);
             _tasks.Add(t); SaveTasks(); TasksChanged?.Invoke(); return t;
         }
 
@@ -60,7 +60,7 @@ namespace TimeFlow
             if (t == null) return false;
             _tasks.Remove(t);
             if (t.Running) t.StopSession(_clock);
-            var r = HistoryRecord.FromTask(t, _clock, "removed");
+            var r = HistoryRecord.FromTask(t, _clock, "deleted");
             r.RemovedAt = Config.NowIso();
             _history.Add(r); SaveTasks(); SaveHistory();
             if (id == ActiveId()) ActiveChanged?.Invoke(null);
@@ -79,13 +79,13 @@ namespace TimeFlow
             TasksChanged?.Invoke(); return true;
         }
 
-        public bool UpdateTask(string id, string name, string category, int estimatedMinutes)
+        public bool UpdateTask(string id, string name, string category, int estimatedSeconds)
         {
             var t = _tasks.FirstOrDefault(x => x.Id == id);
             if (t == null) return false;
             if (!string.IsNullOrEmpty(name?.Trim())) t.Name = name.Trim();
             t.Category = category;
-            t.EstimatedMinutes = estimatedMinutes < 0 ? 0 : estimatedMinutes;
+            t.EstimatedSeconds = estimatedSeconds < 0 ? 0 : estimatedSeconds;
             SaveTasks(); TasksChanged?.Invoke(); return true;
         }
 
