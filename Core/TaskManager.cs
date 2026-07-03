@@ -96,7 +96,8 @@ namespace TimeFlow
         {
             var t = _tasks.FirstOrDefault(x => x.Id == id);
             if (t == null) return;
-            t.StartSession(); SaveTasks();
+            t.StartSession(_clock); 
+			SaveTasks();
             ActiveChanged?.Invoke(id); TasksChanged?.Invoke();
         }
 
@@ -140,6 +141,26 @@ namespace TimeFlow
                     totals[(int)d.Value.DayOfWeek == 0 ? 6 : (int)d.Value.DayOfWeek - 1] += kv.Value;
             }
             return totals;
+        }
+
+        public (double[] data, string[] labels) SecondsByLast7Days(VirtualClock clock)
+        {
+            var data = new double[7];
+            string[] labels = { "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс" };
+
+            DateTime virtualToday = clock != null
+                ? clock.VirtualToday()
+                : DateTime.Today;
+
+            int mondayBasedIndex = ((int)virtualToday.DayOfWeek + 6) % 7;
+            DateTime monday = virtualToday.AddDays(-mondayBasedIndex);
+
+            for (int i = 0; i < 7; i++)
+            {
+                DateTime day = monday.AddDays(i);
+                data[i] = SecondsOnDate(day.ToString("yyyy-MM-dd"));
+            }
+            return (data, labels);
         }
 
         public Dictionary<string, double> SecondsByCategoryToday()
@@ -194,19 +215,51 @@ namespace TimeFlow
 
         private List<string> AllTrackedDays() => SecondsPerDayAll().Keys.ToList();
 
-        private static Dictionary<string, double> SplitSessionsByDay(List<Session> sessions, VirtualClock clock)
-        {
-            var result = new Dictionary<string, double>();
-            foreach (var s in sessions)
-            {
-                if (s.Start <= 0) continue;
-                var dt = DateTimeOffset.FromUnixTimeSeconds((long)s.Start).LocalDateTime;
-                string day = dt.ToString("yyyy-MM-dd");
-                double sec = s.End == 0 && clock != null ? clock.ElapsedVirtualSeconds(s.Start) : s.Vsec;
-                result[day] = result.GetValueOrDefault(day, 0) + sec;
-            }
-            return result;
-        }
+		private static Dictionary<string, double> SplitSessionsByDay(List<Session> sessions, VirtualClock clock)
+		{
+			var result = new Dictionary<string, double>();
+			foreach (var s in sessions)
+			{
+				if (s.Start <= 0) continue;
+				
+				if (s.End == 0 && clock != null)
+				{
+
+					double virtualStart = s.StartVirtual > 0 ? s.StartVirtual : s.Start;
+					double virtualEnd = clock.VirtualSecondsSinceEpoch();
+					
+					var startDt = DateTimeOffset.FromUnixTimeSeconds((long)virtualStart).LocalDateTime;
+					var endDt = DateTimeOffset.FromUnixTimeSeconds((long)virtualEnd).LocalDateTime;
+					
+					var currentDay = startDt.Date;
+					while (currentDay <= endDt.Date)
+					{
+						var dayStartDt = currentDay == startDt.Date ? startDt : currentDay;
+						var dayEndDt = currentDay == endDt.Date ? endDt : currentDay.AddDays(1);
+						
+						double dayStartVirtual = dayStartDt.ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;
+						double dayEndVirtual = dayEndDt.ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;
+						
+						double secondsInDay = dayEndVirtual - dayStartVirtual;
+						if (secondsInDay > 0)
+						{
+							string dayKey = currentDay.ToString("yyyy-MM-dd");
+							result[dayKey] = result.GetValueOrDefault(dayKey, 0) + secondsInDay;
+						}
+						
+						currentDay = currentDay.AddDays(1);
+					}
+				}
+				else
+				{
+
+					var dt = DateTimeOffset.FromUnixTimeSeconds((long)s.Start).LocalDateTime;
+					string day = dt.ToString("yyyy-MM-dd");
+					result[day] = result.GetValueOrDefault(day, 0) + s.Vsec;
+				}
+			}
+			return result;
+		}
 
         private static DateTime? ParseDate(string s)
         {

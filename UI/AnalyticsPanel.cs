@@ -247,6 +247,16 @@ public class AnalyticsPanel : UserControl
         _weeklyChart?.SetData(secondsByWeekday);
     }
 
+    public void UpdateWeeklyChart(double[] secondsByWeekday, string[] dayLabels)
+    {
+        _weeklyChart?.SetData(secondsByWeekday, dayLabels);
+    }
+
+    public void UpdateWeeklyChart(double[] secondsByWeekday, string[] dayLabels, bool virtualTimeActive)
+    {
+        _weeklyChart?.SetData(secondsByWeekday, dayLabels, virtualTimeActive);
+    }
+
     public void UpdateCategoryChart(Dictionary<string, double> secondsByCategory)
     {
         var coloredData = new List<(string Name, double Value, Color Color)>();
@@ -262,11 +272,13 @@ public class AnalyticsPanel : UserControl
     }
 
     public void RefreshAll(double earningsToday, double earningsMonth, List<TaskItem> allTasks,
-                           double[] secondsByWeekday, Dictionary<string, double> secondsByCategory)
+                           double[] secondsByWeekday, string[] dayLabels,
+                           Dictionary<string, double> secondsByCategory,
+                           bool virtualTimeActive = false)
     {
         UpdateEarnings(earningsToday, earningsMonth);
         UpdateActiveTask(allTasks);
-        UpdateWeeklyChart(secondsByWeekday);
+        UpdateWeeklyChart(secondsByWeekday, dayLabels, virtualTimeActive);
         UpdateCategoryChart(secondsByCategory);
     }
 }
@@ -277,9 +289,12 @@ public class WeeklyChart : Control
     private static readonly Color COLOR_TEXT = Color.FromArgb(150, 150, 150);
     private static readonly Color COLOR_BAR = Color.FromArgb(76, 175, 80);
     private static readonly Color COLOR_GRID = Color.FromArgb(60, 60, 60);
+    private static readonly Color COLOR_TODAY = Color.FromArgb(255, 152, 0);
 
     private double[] _data = new double[7];
-    private readonly string[] _dayLabels = { "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс" };
+    private string[] _dayLabels = { "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс" };
+    private int _todayIndex = 6;
+    private bool _virtualTimeActive = false;
 
     public WeeklyChart()
     {
@@ -291,6 +306,22 @@ public class WeeklyChart : Control
     public void SetData(double[] seconds)
     {
         if (seconds != null && seconds.Length == 7) _data = seconds;
+        this.Invalidate();
+    }
+
+    public void SetData(double[] seconds, string[]? dayLabels, int todayIndex = 6)
+    {
+        if (seconds != null && seconds.Length == 7) _data = seconds;
+        if (dayLabels != null && dayLabels.Length == 7) _dayLabels = dayLabels;
+        _todayIndex = todayIndex;
+        this.Invalidate();
+    }
+
+    public void SetData(double[] seconds, string[]? dayLabels, bool virtualTimeActive)
+    {
+        if (seconds != null && seconds.Length == 7) _data = seconds;
+        if (dayLabels != null && dayLabels.Length == 7) _dayLabels = dayLabels;
+        _virtualTimeActive = virtualTimeActive;
         this.Invalidate();
     }
 
@@ -332,7 +363,7 @@ public class WeeklyChart : Control
         float barWidth = totalBarWidth * 0.6f;
         float gap = totalBarWidth * 0.4f;
 
-        using var barBrush = new SolidBrush(COLOR_BAR);
+        using var barBrush = new SolidBrush(_virtualTimeActive ? COLOR_TODAY : COLOR_BAR);
         using var dayFont = new Font("Segoe UI", 9, FontStyle.Regular);
         using var dayBrush = new SolidBrush(COLOR_TEXT);
 
@@ -342,15 +373,17 @@ public class WeeklyChart : Control
             float x = chartLeft + i * totalBarWidth + gap / 2;
             float y = chartTop + chartHeight - barHeight;
 
+            var fillBrush = barBrush;
+
             var rect = new RectangleF(x, y, barWidth, barHeight);
             if (barHeight > 4)
             {
                 using var path = CreateRoundedRect(rect, 4);
-                g.FillPath(barBrush, path);
+                g.FillPath(fillBrush, path);
             }
             else if (barHeight > 0)
             {
-                g.FillRectangle(barBrush, rect);
+                g.FillRectangle(fillBrush, rect);
             }
 
             string dayLabel = _dayLabels[i];

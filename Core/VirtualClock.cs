@@ -3,7 +3,7 @@ using System.Timers;
 
 namespace TimeFlow
 {
- 
+
     public class VirtualClock
     {
         public bool Enabled { get; private set; }
@@ -12,7 +12,7 @@ namespace TimeFlow
         private double _realAnchor;
         private double _virtualOffset;
         private double _lastReal;
-		private readonly System.Timers.Timer _timer;
+        private readonly System.Timers.Timer _timer;
 
         public event Action<double> Ticked;
         public event Action ConfigChanged;
@@ -22,32 +22,43 @@ namespace TimeFlow
             _realAnchor = UnixNow();
             _lastReal = _realAnchor;
             _virtualOffset = 0;
-			_timer = new System.Timers.Timer(1000);
+            _timer = new System.Timers.Timer(1000);
             _timer.Elapsed += (s, e) => OnTick();
         }
 
         public void Configure(bool enabled, double ratio)
         {
-            Accumulate();
             bool wasEnabled = Enabled;
-            Enabled = enabled;
-            Ratio = Math.Max(0.01, ratio);
-
-            if (enabled)
-            {
-                if (!wasEnabled)
-                {
-                    _realAnchor = UnixNow();
-                    _lastReal = _realAnchor;
-                    _virtualOffset = 0;
-                }
-            }
-            else
+            if (enabled && !wasEnabled)
             {
                 _realAnchor = UnixNow();
                 _lastReal = _realAnchor;
                 _virtualOffset = 0;
+                Enabled = true;
+                Ratio = Math.Max(0.01, ratio);
             }
+            else if (!enabled)
+            {
+                Enabled = false;
+                _realAnchor = UnixNow();
+                _lastReal = _realAnchor;
+                _virtualOffset = 0;
+                Ratio = Math.Max(0.01, ratio);
+            }
+            else
+            {
+                Accumulate();
+                Ratio = Math.Max(0.01, ratio);
+            }
+
+            ConfigChanged?.Invoke();
+        }
+        public void Reset()
+        {
+            Enabled = false;
+            _realAnchor = UnixNow();
+            _lastReal = _realAnchor;
+            _virtualOffset = 0;
             ConfigChanged?.Invoke();
         }
 
@@ -82,6 +93,12 @@ namespace TimeFlow
             return Enabled ? interval * Ratio : interval;
         }
 
+        public double ElapsedSinceVirtual(double startVirtualSeconds)
+        {
+            double now = VirtualSecondsSinceEpoch();
+            return Math.Max(0, now - startVirtualSeconds);
+        }
+
         private void OnTick()
         {
             Accumulate();
@@ -92,6 +109,12 @@ namespace TimeFlow
         {
             double v = VirtualSecondsSinceEpoch();
             return DateTimeOffset.FromUnixTimeSeconds((long)v).LocalDateTime.ToString("HH:mm:ss");
+        }
+
+        public DateTime VirtualToday()
+        {
+            double v = VirtualSecondsSinceEpoch();
+            return DateTimeOffset.FromUnixTimeSeconds((long)v).LocalDateTime.Date;
         }
 
         private static double UnixNow() => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
