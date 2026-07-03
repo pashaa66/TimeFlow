@@ -28,7 +28,7 @@ public class TaskCard : UserControl
     private TableLayoutPanel? _namePanel;
     private Label? _lblGoal;     
     private Label? _lblTime;
-    private FlowLayoutPanel? _btnPanel;
+    private TableLayoutPanel? _btnPanel;  
     private Button? _btnRun;     // ▶ / ⏸ — переключатель Start/Stop
     private Button? _btnDone;    // ✓
     private Button? _btnDelete;  // ✕
@@ -70,7 +70,7 @@ public class TaskCard : UserControl
         };
         _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 8F));     // catBar
         _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));   // namePanel
-        _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170F));  // goal 
+        _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210F));  // goal 
         _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100F));  // time
         _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150F));  // buttons
         _layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
@@ -146,8 +146,8 @@ public class TaskCard : UserControl
             Padding = new Padding(0, 0, 8, 0),
             Margin = new Padding(0),
             BackColor = COLOR_CARD_INNER,
-            Text = "(Цель: 00.00.00)",
-            AutoEllipsis = false
+            Text = "(Цель: 00 ч. 00 мин. 00 сек.)",
+            AutoEllipsis = true
         };
 
         _lblTime = new Label
@@ -164,19 +164,27 @@ public class TaskCard : UserControl
             AutoEllipsis = false
         };
 
-        _btnPanel = new FlowLayoutPanel
+        _btnPanel = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false,
+            ColumnCount = 3,
+            RowCount = 1,
             BackColor = COLOR_CARD_INNER,
             Padding = new Padding(4, 14, 4, 14),
             Margin = new Padding(0)
         };
+        _btnPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
+        _btnPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
+        _btnPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.34F));
+        _btnPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
         _btnRun = CreateBtn("▶", COLOR_ACCENT);
         _btnDone = CreateBtn("✓", COLOR_DONE_BLUE);
         _btnDelete = CreateBtn("✕", COLOR_DEL_RED);
+
+        _btnRun.Dock = DockStyle.Fill;
+        _btnDone.Dock = DockStyle.Fill;
+        _btnDelete.Dock = DockStyle.Fill;
 
         _btnRun.Click += (_, _) =>
         {
@@ -187,9 +195,9 @@ public class TaskCard : UserControl
         _btnDone.Click += (_, _) => { if (_task != null) DoneClicked?.Invoke(this, _task); };
         _btnDelete.Click += (_, _) => { if (_task != null) DeleteClicked?.Invoke(this, _task); };
 
-        _btnPanel.Controls.Add(_btnRun);
-        _btnPanel.Controls.Add(_btnDone);
-        _btnPanel.Controls.Add(_btnDelete);
+        _btnPanel.Controls.Add(_btnRun, 0, 0);
+        _btnPanel.Controls.Add(_btnDone, 1, 0);
+        _btnPanel.Controls.Add(_btnDelete, 2, 0);
 
         _layout.Controls.Add(_catBar, 0, 0);
         _layout.Controls.Add(_namePanel, 1, 0);
@@ -283,7 +291,7 @@ public class TaskCard : UserControl
 
         bool isRunning = task.Running;
         bool isDone = task.Done;
-		
+                
         Color borderColor = isRunning ? COLOR_ACCENT : COLOR_BORDER;
         Color innerColor  = isRunning ? COLOR_RUN_BG_INNER : COLOR_CARD_INNER;
 
@@ -325,34 +333,43 @@ public class TaskCard : UserControl
         _btnDelete.Visible = true;
     }
 
-    private static string FormatGoal(int estimatedSeconds)
-    {
-        long totalSec = (long)estimatedSeconds;
-        long secPerMin = 60;
-        long secPerHour = 3600;
-        long secPerDay = 86400;
-        long secPerMonth = 30 * secPerDay;  
-        long secPerYear = 365 * secPerDay;    
+	private static string FormatGoal(int estimatedSeconds)
+	{
+		if (estimatedSeconds <= 0)
+			return "00 ч. 00 мин. 00 сек.";
 
-        long years = totalSec / secPerYear;
-        long rem = totalSec % secPerYear;
-        long months = rem / secPerMonth;
-        rem = rem % secPerMonth;
-        long days = rem / secPerDay;
-        rem = rem % secPerDay;
-        long hours = rem / secPerHour;
-        rem = rem % secPerHour;
-        long mins = rem / secPerMin;
-        long secs = rem % secPerMin;
-        string time = $"{hours:D2}:{mins:D2}:{secs:D2}";
-        if (years > 0)
-            return $"(Цель: {years:D2}.{months:D2}.{days:D2}.{time})";
-        if (months > 0)
-            return $"(Цель: {months:D2}.{days:D2}.{time})";
-        if (days > 0)
-            return $"(Цель: {days:D2}.{time})";
-        return $"(Цель: {time})";
-    }
+		DateTime baseDate = new DateTime(2000, 1, 1, 0, 0, 0);
+		DateTime targetDate = baseDate.AddSeconds(estimatedSeconds);
+
+		int years = targetDate.Year - baseDate.Year;
+		int months = targetDate.Month - baseDate.Month;
+		int days = targetDate.Day - baseDate.Day;
+		int hours = targetDate.Hour;
+		int minutes = targetDate.Minute;
+		int seconds = targetDate.Second;
+
+		if (seconds < 0) { seconds += 60; minutes--; }
+		if (minutes < 0) { minutes += 60; hours--; }
+		if (hours < 0) { hours += 24; days--; }
+		if (days < 0)
+		{
+			DateTime prevMonth = targetDate.AddMonths(-1);
+			days += DateTime.DaysInMonth(prevMonth.Year, prevMonth.Month);
+			months--;
+		}
+		if (months < 0) { months += 12; years--; }
+
+		string time = $"{hours:D2} ч. {minutes:D2} мин. {seconds:D2} сек.";
+		
+		if (years > 0)
+			return $"{years:D2} г. {months:D2} мес. {days:D2} д. {time}";
+		if (months > 0)
+			return $"{months:D2} мес. {days:D2} д. {time}";
+		if (days > 0)
+			return $"{days:D2} д. {time}";
+		
+		return time;
+	}
 
     private static string FormatCreatedAt(string? createdAt)
     {

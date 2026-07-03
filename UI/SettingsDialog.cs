@@ -365,7 +365,7 @@ public class SettingsDialog : Form
         {
             Dock = DockStyle.Fill,
             Minimum = 0.01M,
-            Maximum = 100M,
+            Maximum = 10000000M,
             DecimalPlaces = 2,
             Increment = 0.5M,
             BackColor = COLOR_BACKGROUND,
@@ -1025,7 +1025,6 @@ public class SettingsDialog : Form
     }
 }
 
-// ColorDot — цветной квадрат палитры
 public class ColorDot : Label
 {
     public string Hex { get; }

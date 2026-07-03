@@ -9,6 +9,7 @@ namespace TimeFlow
         public double Start { get; set; }
         public double End { get; set; }
         public double Vsec { get; set; }
+        public double StartVirtual { get; set; }
 
         [JsonIgnore] public bool IsActive => End == 0;
     }
@@ -35,11 +36,18 @@ namespace TimeFlow
             CreatedAt = Config.NowIso();
         }
 
-        public void StartSession()
-        {
-            if (Running) return;
-            Sessions.Add(new Session { Start = DateTimeOffset.UtcNow.ToUnixTimeSeconds(), End = 0, Vsec = 0 });
-        }
+		public void StartSession(VirtualClock? clock = null)
+		{
+			if (Running) return;
+			double startVirtual = clock != null ? clock.VirtualSecondsSinceEpoch() : 0;
+			Sessions.Add(new Session 
+			{ 
+				Start = DateTimeOffset.UtcNow.ToUnixTimeSeconds(), 
+				End = 0, 
+				Vsec = 0,
+				StartVirtual = startVirtual
+			});
+		}
 
         public void StopSession(VirtualClock? clock = null)
         {
@@ -49,8 +57,8 @@ namespace TimeFlow
                 if (s.End == 0)
                 {
                     s.End = now;
-                    double st = s.Start > 0 ? s.Start : s.End;
-                    s.Vsec = clock != null ? clock.ElapsedVirtualSeconds(st) : s.End - st;
+                    double startVirtual = s.StartVirtual > 0 ? s.StartVirtual : (s.Start > 0 ? s.Start : s.End);
+                    s.Vsec = clock != null ? clock.ElapsedSinceVirtual(startVirtual) : s.End - (s.Start > 0 ? s.Start : s.End);
                 }
             }
         }
@@ -61,9 +69,15 @@ namespace TimeFlow
             double now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             foreach (var s in Sessions)
             {
-                if (s.End != 0) total += s.Vsec;
-                else if (clock != null) total += clock.ElapsedVirtualSeconds(s.Start > 0 ? s.Start : now);
-                else total += now - (s.Start > 0 ? s.Start : now);
+                if (s.End != 0)
+                {
+                    total += s.Vsec;
+                }
+                else
+                {
+                    double startVirtual = s.StartVirtual > 0 ? s.StartVirtual : (s.Start > 0 ? s.Start : now);
+                    total += clock != null ? clock.ElapsedSinceVirtual(startVirtual) : now - (s.Start > 0 ? s.Start : now);
+                }
             }
             return total;
         }

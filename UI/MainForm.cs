@@ -168,6 +168,8 @@ public partial class MainForm : Form
             {
                 if (this.IsDisposed) return;
                 UpdateVTimeDisplay();
+
+                RefreshAnalytics();
             }));
         }
         catch (InvalidOperationException) { }
@@ -221,30 +223,59 @@ public partial class MainForm : Form
         catch (InvalidOperationException) { }
     }
 
-    private void StartUiTimer()
-    {
-        _uiTimer.Tick += (_, _) =>
-        {
-            if (this.IsDisposed || !this.IsHandleCreated) return;
-            try
-            {
-                if (_tasks.Tasks.Any(t => t.Running))
-                {
-                    _tasksPanel?.UpdateTimers(_clock);
-                    RefreshAnalytics();
-                }
-                UpdatePomodoroDisplay();
-                UpdateVTimeDisplay();
+	private void StartUiTimer()
+	{
+		_uiTimer.Tick += (_, _) =>
+		{
+			if (this.IsDisposed || !this.IsHandleCreated) return;
+			try
+			{
+				if (_tasks.Tasks.Any(t => t.Running))
+				{
+					_tasksPanel?.UpdateTimers(_clock);
+					RefreshAnalytics();
+				}
+				else if (_clock.Enabled)
+				{
+					RefreshAnalytics();
+				}
+				UpdatePomodoroDisplay();
+				UpdateVTimeDisplay();
 
-                _miniTimer?.RefreshTasks(_tasks.Tasks);
-            }
-            catch (InvalidOperationException) { }
-        };
-        _uiTimer.Start();
-    }
+				_miniTimer?.RefreshTasks(_tasks.Tasks);
+			}
+			catch (InvalidOperationException) { }
+		};
+		_uiTimer.Start();
+	}
 
     private void ToggleVirtualTime()
     {
+
+        if (_clock.Enabled)
+        {
+            string message =
+                "Вы уверены что хотите отключить виртуальное время? " +
+                "Ваши данные, полученные за время работы виртуального время, " +
+                "вернутся в исходное положение. " +
+                "Предлагается сначала остановить, удалить или выполнить задачу " +
+                "перед остановкой виртуального времени.";
+
+            var result = MessageBox.Show(
+                this,
+                message,
+                "Подтверждение остановки виртуального времени",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2);
+
+            if (result != DialogResult.Yes)
+            {
+                UpdateVTimeDisplay();
+                return;
+            }
+        }
+
         bool newEnabled = !_clock.Enabled;
         double ratio = _settings.GetDouble("virtual_time_ratio", 1.0);
         _clock.Configure(newEnabled, ratio);
@@ -850,21 +881,22 @@ public partial class MainForm : Form
         return Icon.FromHandle(bmp.GetHicon());
     }
 
-    // === Расчёт статистики для аналитики ===
-    private void RefreshAnalytics()
-    {
-        if (_analyticsPanel == null) return;
+	private void RefreshAnalytics()
+	{
+		if (_analyticsPanel == null) return;
 
-        double earningsToday = _tasks.EarningsToday();
-        double earningsMonth = _tasks.EarningsMonth();
-        double[] weekly = _tasks.SecondsByWeekday();
-        var byCategory = _tasks.SecondsByCategoryToday();
+		double earningsToday = _tasks.EarningsToday();
+		double earningsMonth = _tasks.EarningsMonth();
 
-        _analyticsPanel.RefreshAll(
-            earningsToday, earningsMonth,
-            _tasks.Tasks.ToList(),
-            weekly, byCategory);
-    }
+		var (weekly, dayLabels) = _tasks.SecondsByLast7Days(_clock);
+		var byCategory = _tasks.SecondsByCategoryToday();
+
+		_analyticsPanel.RefreshAll(
+			earningsToday, earningsMonth,
+			_tasks.Tasks.ToList(),
+			weekly, dayLabels, byCategory,
+			_clock.Enabled);
+	}
 
     private void ShowHistoryDialog()
     {
@@ -888,7 +920,7 @@ public partial class MainForm : Form
     {
         using var dlg = new Form();
         dlg.Text = "Добавление новой задачи";
-        dlg.Size = new Size(480, 520);
+        dlg.Size = new Size(720, 540);
         dlg.StartPosition = FormStartPosition.CenterParent;
         dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
         dlg.MaximizeBox = false;
@@ -939,20 +971,34 @@ public partial class MainForm : Form
         var goalPanel = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 8,
+            ColumnCount = 14,
             RowCount = 1,
             Margin = new Padding(0, 0, 0, 12),
             Padding = new Padding(0),
             BackColor = COLOR_SURFACE
         };
-        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 60F));   // «Цель:» label
-        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70F));   // часы
-        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 22F));   // «ч.»
-        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70F));   // минуты
-        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 42F));   // «мин.»
-        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70F));   // секунды
-        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 42F));   // «сек.»
-        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));   // filler
+
+        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 55F));
+
+        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 55F));
+        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 24F));
+
+        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 50F));
+        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 40F));
+
+        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 50F));
+        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 24F));
+
+        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 55F));
+        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 24F));
+
+        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 50F));
+        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 40F));
+
+        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 50F));
+        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 40F));
+
+        goalPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         goalPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
         var lblGoalInline = new Label
@@ -960,6 +1006,66 @@ public partial class MainForm : Form
             Text = "Цель:",
             Dock = DockStyle.Fill,
             Font = new Font("Segoe UI", 10F, FontStyle.Regular),
+            ForeColor = COLOR_TEXT_PRIMARY,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0)
+        };
+        var numYears = new NumericUpDown
+        {
+            Minimum = 0,
+            Maximum = 50,
+            Value = 0,
+            Dock = DockStyle.Fill,
+            BackColor = COLOR_BACKGROUND,
+            ForeColor = COLOR_TEXT_PRIMARY,
+            Font = new Font("Segoe UI", 10F),
+            Margin = new Padding(0, 2, 3, 2)
+        };
+        var lblY = new Label
+        {
+            Text = "г.",
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI", 9F),
+            ForeColor = COLOR_TEXT_PRIMARY,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0)
+        };
+        var numMonths = new NumericUpDown
+        {
+            Minimum = 0,
+            Maximum = 11,
+            Value = 0,
+            Dock = DockStyle.Fill,
+            BackColor = COLOR_BACKGROUND,
+            ForeColor = COLOR_TEXT_PRIMARY,
+            Font = new Font("Segoe UI", 10F),
+            Margin = new Padding(3, 2, 3, 2)
+        };
+        var lblMo = new Label
+        {
+            Text = "мес.",
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI", 9F),
+            ForeColor = COLOR_TEXT_PRIMARY,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0)
+        };
+        var numDays = new NumericUpDown
+        {
+            Minimum = 0,
+            Maximum = 31,
+            Value = 0,
+            Dock = DockStyle.Fill,
+            BackColor = COLOR_BACKGROUND,
+            ForeColor = COLOR_TEXT_PRIMARY,
+            Font = new Font("Segoe UI", 10F),
+            Margin = new Padding(3, 2, 3, 2)
+        };
+        var lblD = new Label
+        {
+            Text = "д.",
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI", 9F),
             ForeColor = COLOR_TEXT_PRIMARY,
             TextAlign = ContentAlignment.MiddleLeft,
             Margin = new Padding(0)
@@ -973,7 +1079,7 @@ public partial class MainForm : Form
             BackColor = COLOR_BACKGROUND,
             ForeColor = COLOR_TEXT_PRIMARY,
             Font = new Font("Segoe UI", 10F),
-            Margin = new Padding(0, 2, 4, 2)
+            Margin = new Padding(3, 2, 3, 2)
         };
         var lblH = new Label
         {
@@ -993,7 +1099,7 @@ public partial class MainForm : Form
             BackColor = COLOR_BACKGROUND,
             ForeColor = COLOR_TEXT_PRIMARY,
             Font = new Font("Segoe UI", 10F),
-            Margin = new Padding(4, 2, 4, 2)
+            Margin = new Padding(3, 2, 3, 2)
         };
         var lblM = new Label
         {
@@ -1013,7 +1119,7 @@ public partial class MainForm : Form
             BackColor = COLOR_BACKGROUND,
             ForeColor = COLOR_TEXT_PRIMARY,
             Font = new Font("Segoe UI", 10F),
-            Margin = new Padding(4, 2, 4, 2)
+            Margin = new Padding(3, 2, 3, 2)
         };
         var lblS = new Label
         {
@@ -1025,13 +1131,19 @@ public partial class MainForm : Form
             Margin = new Padding(0)
         };
         goalPanel.Controls.Add(lblGoalInline, 0, 0);
-        goalPanel.Controls.Add(numHours, 1, 0);
-        goalPanel.Controls.Add(lblH, 2, 0);
-        goalPanel.Controls.Add(numMinutes, 3, 0);
-        goalPanel.Controls.Add(lblM, 4, 0);
-        goalPanel.Controls.Add(numSeconds, 5, 0);
-        goalPanel.Controls.Add(lblS, 6, 0);
-        goalPanel.Controls.Add(new Panel { Dock = DockStyle.Fill, BackColor = COLOR_SURFACE }, 7, 0);
+        goalPanel.Controls.Add(numYears,    1, 0);
+        goalPanel.Controls.Add(lblY,        2, 0);
+        goalPanel.Controls.Add(numMonths,   3, 0);
+        goalPanel.Controls.Add(lblMo,       4, 0);
+        goalPanel.Controls.Add(numDays,     5, 0);
+        goalPanel.Controls.Add(lblD,        6, 0);
+        goalPanel.Controls.Add(numHours,    7, 0);
+        goalPanel.Controls.Add(lblH,        8, 0);
+        goalPanel.Controls.Add(numMinutes,  9, 0);
+        goalPanel.Controls.Add(lblM,       10, 0);
+        goalPanel.Controls.Add(numSeconds, 11, 0);
+        goalPanel.Controls.Add(lblS,       12, 0);
+        goalPanel.Controls.Add(new Panel { Dock = DockStyle.Fill, BackColor = COLOR_SURFACE }, 13, 0);
         tlp.Controls.Add(goalPanel, 0, 2);
 
         var lblCat = new Label
@@ -1087,25 +1199,33 @@ public partial class MainForm : Form
             Cursor = Cursors.Hand,
             Margin = new Padding(0)
         };
-        btnOk.Click += (_, _) =>
-        {
-            if (!string.IsNullOrWhiteSpace(txtName.Text))
-            {
-                int goalSeconds = (int)numHours.Value * 3600
-                                + (int)numMinutes.Value * 60
-                                + (int)numSeconds.Value;
-                _tasks.AddTask(txtName.Text, cmbCat.SelectedItem?.ToString() ?? "Учёба", goalSeconds);
-                dlg.DialogResult = DialogResult.OK;
-                dlg.Close();
-            }
-            else
-            {
-                MessageBox.Show(dlg, "Введите название задачи.", dlg.Text,
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-                txtName.Focus();
-            }
-        };
-
+		btnOk.Click += (_, _) =>
+		{
+			if (!string.IsNullOrWhiteSpace(txtName.Text))
+			{
+				DateTime baseDate = new DateTime(2000, 1, 1, 0, 0, 0);
+				DateTime targetDate = baseDate
+					.AddYears((int)numYears.Value)
+					.AddMonths((int)numMonths.Value)
+					.AddDays((int)numDays.Value)
+					.AddHours((int)numHours.Value)
+					.AddMinutes((int)numMinutes.Value)
+					.AddSeconds((int)numSeconds.Value);
+				
+				long rawSeconds = (long)(targetDate - baseDate).TotalSeconds;
+				int goalSeconds = rawSeconds > int.MaxValue ? int.MaxValue : (int)rawSeconds;
+				
+				_tasks.AddTask(txtName.Text, cmbCat.SelectedItem?.ToString() ?? "Учёба", goalSeconds);
+				dlg.DialogResult = DialogResult.OK;
+				dlg.Close();
+			}
+			else
+			{
+				MessageBox.Show(dlg, "Введите название задачи.", dlg.Text,
+					MessageBoxButtons.OK, MessageBoxIcon.Information);
+				txtName.Focus();
+			}
+		};
         var btnCancel = new Button
         {
             Text = "Отмена",
